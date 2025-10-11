@@ -45,12 +45,15 @@ deletions- strikethrough and highlighted in yellow
   - [x] Add dm sans font 
   - [x] Need big placeholder with color and make background color correct 
   - [x] Make left side only take up 40% hw
-- [ ] Figure out logic on where to put start of llm text if theyre very different
-- [ ] Better default text for plan and llm response
-- [ ] How to make the placeholders store formatting
-- [ ] Atomic diff/save editing
+- [x] Better default text for plan and llm response
+- [x] How to make the placeholders store formatting
+- [x] toggling multipage edits
+- [ ] Big save button on top
+- [ ] ui toggle between highlight/pink text
+- [ ] Atomic diff/save functionality +ui
+- [ ] Remove quill component box styling
 - [ ] Simplify/clean up js logic
 - [ ] Try out different string matchers
-- [ ] Save/toggling multipage edits
 - [ ] Version history far down the road, but possible since I'm tracking and updating all edits
+- [ ] Figure out logic on where to put start of llm text if theyre very different
 

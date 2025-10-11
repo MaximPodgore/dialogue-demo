@@ -100,8 +100,25 @@ const Editor = forwardRef<any, {
 Editor.displayName = 'Editor';
 
 type Props = {
-  initial?: string;
+  initial?: string | any; // Can be string or Delta object for formatted content
+  currentFile?: string; // Current filename being edited
+  fileContents?: Map<string, any>; // Map of filename to current content (including unsaved edits)
+  onContentChange?: (filename: string, content: any, hasChanges: boolean) => void; // Notify parent of content changes
   onApplyNewContent?: (applyFn: (newContent: string) => void) => void;
+  onPendingEditStateChange?: (filename: string, pendingState: {
+    hasEdits: boolean;
+    original: string;
+    originalDelta: any;
+    lastDisplayedDiffs: any[];
+    userContent: string;
+  } | null) => void; // Notify parent of pending edit state changes
+  pendingEditState?: {
+    hasEdits: boolean;
+    original: string;
+    originalDelta: any;
+    lastDisplayedDiffs: any[];
+    userContent: string;
+  } | null; // Restored pending edit state for current file
 };
 
 /**
@@ -110,20 +127,148 @@ type Props = {
  * Behavior:
  * - User changes: Automatically accepted, no diff visualization, no Accept/Discard buttons
  * - LLM changes: Show diff visualization with Accept/Discard buttons for review
+ * - File switching: Maintains separate edit state for each file
+ * 
+ * Props:
+ * - initial: Can be a string or Delta object for formatted placeholder content
+ * - currentFile: Current filename being edited
+ * - fileContents: Map of filename to current content (including unsaved edits)
+ * - onContentChange: Callback when content changes
  */
-export default function TrackedQuill({ initial = "Start typing here...", onApplyNewContent }: Props) {
-  const [original, setOriginal] = useState<string>(initial);
-  const [originalDelta, setOriginalDelta] = useState<any>(null);
-  const [hasEdits, setHasEdits] = useState(false);
+export default function TrackedQuill({ 
+  initial = "Start typing here...", 
+  currentFile, 
+  fileContents, 
+  onContentChange, 
+  onApplyNewContent, 
+  onPendingEditStateChange,
+  pendingEditState 
+}: Props) {
+  // Convert initial to a standardized format and extract plain text
+  const getInitialContent = () => {
+    // If currentFile is provided and we have content for it, use that
+    if (currentFile && fileContents && fileContents.has(currentFile)) {
+      const content = fileContents.get(currentFile);
+      if (content) {
+        // Extract plain text from the delta
+        let text = '';
+        if (content.ops) {
+          for (const op of content.ops) {
+            if (typeof op.insert === 'string') {
+              text += op.insert;
+            }
+          }
+        }
+        return {
+          text: text.replace(/\n$/, ''), // Remove trailing newline if present
+          delta: content
+        };
+      }
+    }
+    
+    // Fallback to initial prop
+    if (typeof initial === 'string') {
+      return {
+        text: initial,
+        delta: null
+      };
+    } else {
+      // If it's a Delta object, extract plain text for comparison purposes
+      let text = '';
+      if (initial && initial.ops) {
+        for (const op of initial.ops) {
+          if (typeof op.insert === 'string') {
+            text += op.insert;
+          }
+        }
+      }
+      return {
+        text: text.replace(/\n$/, ''), // Remove trailing newline if present
+        delta: initial
+      };
+    }
+  };
+
+  const initialContent = getInitialContent();
+  
+  // Initialize state, potentially from restored pending edit state
+  const getInitialStateFromPending = () => {
+    if (pendingEditState) {
+      return {
+        original: pendingEditState.original,
+        originalDelta: pendingEditState.originalDelta,
+        hasEdits: pendingEditState.hasEdits,
+        userContent: pendingEditState.userContent,
+        lastDisplayedDiffs: pendingEditState.lastDisplayedDiffs
+      };
+    }
+    return {
+      original: initialContent.text,
+      originalDelta: initialContent.delta,
+      hasEdits: false,
+      userContent: initialContent.text,
+      lastDisplayedDiffs: []
+    };
+  };
+
+  const initialState = getInitialStateFromPending();
+  const [original, setOriginal] = useState<string>(initialState.original);
+  const [originalDelta, setOriginalDelta] = useState<any>(initialState.originalDelta);
+  const [hasEdits, setHasEdits] = useState(initialState.hasEdits);
   
   // Use a ref to access the quill instance directly
   const quillRef = useRef<any>(null);
   const applyingRef = useRef(false);
   const debounceTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const switchingFilesRef = useRef(false); // Track when we're switching files
   
   // Track the actual user content separate from display content
-  const userContentRef = useRef<string>(initial);
-  const lastDisplayedDiffsRef = useRef<any[]>([]);
+  const userContentRef = useRef<string>(initialState.userContent);
+  const lastDisplayedDiffsRef = useRef<any[]>(initialState.lastDisplayedDiffs);
+
+  // Handle file switching
+  useEffect(() => {
+    if (!quillRef.current || !currentFile) return;
+    
+    switchingFilesRef.current = true; // Prevent notifications during file switch
+    
+    // Check if we have pending edit state to restore
+    if (pendingEditState) {
+      // Restore pending edit state
+      setOriginal(pendingEditState.original);
+      setOriginalDelta(pendingEditState.originalDelta);
+      setHasEdits(pendingEditState.hasEdits);
+      userContentRef.current = pendingEditState.userContent;
+      lastDisplayedDiffsRef.current = pendingEditState.lastDisplayedDiffs;
+    } else {
+      // No pending edits, use clean content
+      const newContent = getInitialContent();
+      
+      // Update state to match new file
+      setOriginal(newContent.text);
+      setOriginalDelta(newContent.delta);
+      setHasEdits(false);
+      userContentRef.current = newContent.text;
+      lastDisplayedDiffsRef.current = [];
+    }
+    
+    // Update editor content
+    applyingRef.current = true;
+    const content = getInitialContent();
+    if (content.delta) {
+      quillRef.current.setContents(content.delta);
+    } else {
+      quillRef.current.setText(content.text);
+    }
+    applyingRef.current = false;
+    
+    // Allow notifications after file switch is complete
+    setTimeout(() => {
+      switchingFilesRef.current = false;
+    }, 0);
+  }, [currentFile, fileContents]);
+
+  // Remove the separate pendingEditState effect to avoid circular dependencies
 
   // Cleanup timer on unmount
   useEffect(() => {
@@ -133,6 +278,28 @@ export default function TrackedQuill({ initial = "Start typing here...", onApply
       }
     };
   }, []);
+
+  // Helper function to notify parent of pending edit state changes
+  const notifyPendingEditStateChange = (newHasEdits: boolean) => {
+    if (!currentFile || !onPendingEditStateChange || switchingFilesRef.current) return;
+    
+    if (newHasEdits) {
+      onPendingEditStateChange(currentFile, {
+        hasEdits: newHasEdits,
+        original,
+        originalDelta,
+        lastDisplayedDiffs: lastDisplayedDiffsRef.current,
+        userContent: userContentRef.current
+      });
+    } else {
+      onPendingEditStateChange(currentFile, null);
+    }
+  };
+
+  // Watch for hasEdits changes to notify parent
+  useEffect(() => {
+    notifyPendingEditStateChange(hasEdits);
+  }, [hasEdits, original, originalDelta, currentFile]);
 
   // Register the applyNewContent function with parent
   useEffect(() => {
@@ -285,25 +452,36 @@ export default function TrackedQuill({ initial = "Start typing here...", onApply
     userContentRef.current = trimmedNewContent;
     lastDisplayedDiffsRef.current = diffs;
     setHasEdits(true); // This ensures Accept/Discard buttons show for LLM changes
+    
+    // Store the diff-formatted content in parent's fileContents for restoration
+    if (currentFile && onContentChange) {
+      onContentChange(currentFile, newDelta, true); // hasChanges = true for pending edits
+    }
+    
     applyingRef.current = false;
   };
 
   // Initialize originalDelta when quill is ready
   useEffect(() => {
     if (quillRef.current && !originalDelta) {
-      // Set initial content and capture the delta
-      quillRef.current.setText(original);
-      // Ensure no background or strike formatting is present in the initial delta
-      const length = quillRef.current.getLength();
-      if (length > 0) {
-        quillRef.current.formatText(0, length, "background", false);
-        quillRef.current.formatText(0, length, "strike", false);
+      // Set initial content - use Delta if provided, otherwise plain text
+      if (initialContent.delta) {
+        quillRef.current.setContents(initialContent.delta);
+        setOriginalDelta(initialContent.delta);
+      } else {
+        quillRef.current.setText(original);
+        // Ensure no background or strike formatting is present in the initial delta
+        const length = quillRef.current.getLength();
+        if (length > 0) {
+          quillRef.current.formatText(0, length, "background", false);
+          quillRef.current.formatText(0, length, "strike", false);
+        }
+        setOriginalDelta(quillRef.current.getContents());
       }
-      setOriginalDelta(quillRef.current.getContents());
       userContentRef.current = original;
       lastDisplayedDiffsRef.current = [];
     }
-  }, [quillRef.current, original, originalDelta]);
+  }, [quillRef.current, original, originalDelta, initialContent]);
 
   // Extract user content (non-strikethrough text) from editor
   const extractUserContent = (): string => {
@@ -588,6 +766,12 @@ export default function TrackedQuill({ initial = "Start typing here...", onApply
       }
       const cleanDelta = new Delta(cleanOps);
       setOriginalDelta(cleanDelta);
+      
+      // Notify parent of content change
+      if (currentFile && onContentChange) {
+        const hasChanges = currentUserContent !== original;
+        onContentChange(currentFile, cleanDelta, hasChanges);
+      }
     }
     
     // Clear any visual diff markers since user changes don't need diff visualization
@@ -648,6 +832,13 @@ export default function TrackedQuill({ initial = "Start typing here...", onApply
     userContentRef.current = finalContent;
     lastDisplayedDiffsRef.current = [];
     setHasEdits(false);
+    
+    // Notify parent of content change
+    if (currentFile && onContentChange) {
+      const hasChanges = finalContent !== original;
+      onContentChange(currentFile, cleanDelta, hasChanges);
+    }
+    
     applyingRef.current = false;
   };
 
@@ -667,6 +858,13 @@ export default function TrackedQuill({ initial = "Start typing here...", onApply
     userContentRef.current = original;
     lastDisplayedDiffsRef.current = [];
     setHasEdits(false);
+    
+    // Notify parent of content restoration
+    if (currentFile && onContentChange) {
+      const hasChanges = false; // When discarding, we're back to original
+      onContentChange(currentFile, originalDelta, hasChanges);
+    }
+    
     applyingRef.current = false;
   };
 
@@ -674,7 +872,7 @@ export default function TrackedQuill({ initial = "Start typing here...", onApply
     <div className="flex flex-col gap-2">
       <Editor
         ref={quillRef}
-        defaultValue={original}
+        defaultValue={initialContent.delta || original}
         onTextChange={handleTextChange}
       />
       
