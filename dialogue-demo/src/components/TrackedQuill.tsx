@@ -104,6 +104,13 @@ type Props = {
   onApplyNewContent?: (applyFn: (newContent: string) => void) => void;
 };
 
+/**
+ * TrackedQuill Component
+ * 
+ * Behavior:
+ * - User changes: Automatically accepted, no diff visualization, no Accept/Discard buttons
+ * - LLM changes: Show diff visualization with Accept/Discard buttons for review
+ */
 export default function TrackedQuill({ initial = "Start typing here...", onApplyNewContent }: Props) {
   const [original, setOriginal] = useState<string>(initial);
   const [originalDelta, setOriginalDelta] = useState<any>(null);
@@ -145,33 +152,126 @@ export default function TrackedQuill({ initial = "Start typing here...", onApply
     
     applyingRef.current = true;
     
-    // Compare the new LLM content against the original text (not current user content)
+    // Trim leading whitespace to ensure LLM content starts from the first line
+    const trimmedNewContent = newContent.replace(/^\s+/, '');
+    
+    // Compare the new LLM content against the current user content (not original placeholder)
+    const currentUserContent = extractUserContent();
     const dmp = new DiffMatchPatch();
-    const diffs = dmp.diff_main(original, newContent);
+    const diffs = dmp.diff_main(currentUserContent, trimmedNewContent);
     dmp.diff_cleanupSemantic(diffs);
     
-    // Apply the diff formatting to show what the LLM is suggesting vs the original
+    // Get current content with existing user formatting
+    const currentContents = quillRef.current.getContents();
+    const userOps: any[] = [];
+    
+    // Extract existing user content ops (excluding diff markers) to preserve formatting
+    if (currentContents && currentContents.ops) {
+      for (const op of currentContents.ops) {
+        if (typeof op.insert === 'string') {
+          const isStrikethrough = op.attributes && op.attributes.strike;
+          if (!isStrikethrough) {
+            // Clean the attributes to remove our diff markers but keep user formatting
+            if (op.attributes) {
+              const cleanAttributes = { ...op.attributes };
+              delete cleanAttributes.background;
+              delete cleanAttributes.strike;
+              
+              if (Object.keys(cleanAttributes).length > 0) {
+                userOps.push({ insert: op.insert, attributes: cleanAttributes });
+              } else {
+                userOps.push({ insert: op.insert });
+              }
+            } else {
+              userOps.push({ insert: op.insert });
+            }
+          }
+        } else {
+          userOps.push(op); // embeds, etc.
+        }
+      }
+    }
+    
+    // Apply the diff formatting while preserving existing user formatting
     const newOps: any[] = [];
+    let userOpIndex = 0;
+    let charCountInCurrentOp = 0;
     
     for (const diff of diffs) {
       const type = diff[0];
       const str = diff[1] as string;
       
       if (type === 0) {
-        // Equal: no formatting (text that stays the same)
-        newOps.push({ insert: str });
+        // Equal: preserve existing user formatting
+        let remaining = str.length;
+        while (remaining > 0 && userOpIndex < userOps.length) {
+          const userOp = userOps[userOpIndex];
+          if (typeof userOp.insert === 'string') {
+            const available = userOp.insert.length - charCountInCurrentOp;
+            const toTake = Math.min(remaining, available);
+            const text = userOp.insert.substring(charCountInCurrentOp, charCountInCurrentOp + toTake);
+            
+            if (userOp.attributes) {
+              newOps.push({ insert: text, attributes: userOp.attributes });
+            } else {
+              newOps.push({ insert: text });
+            }
+            
+            remaining -= toTake;
+            charCountInCurrentOp += toTake;
+            
+            if (charCountInCurrentOp >= userOp.insert.length) {
+              userOpIndex++;
+              charCountInCurrentOp = 0;
+            }
+          } else {
+            newOps.push(userOp);
+            userOpIndex++;
+          }
+        }
       } else if (type === 1) {
-        // Insertion: highlight with yellow background (LLM added this)
+        // Insertion: highlight with yellow background, use minimal formatting for new text
         newOps.push({ insert: str, attributes: { background: "#fff59d" } });
       } else if (type === -1) {
-        // Deletion: show with strikethrough and highlighting (LLM removed this from original)
-        newOps.push({ 
-          insert: str, 
-          attributes: { 
-            background: "#ffecb3",
-            strike: true
-          } 
-        });
+        // Deletion: show with strikethrough and highlighting, try to preserve original formatting
+        let remaining = str.length;
+        while (remaining > 0 && userOpIndex < userOps.length) {
+          const userOp = userOps[userOpIndex];
+          if (typeof userOp.insert === 'string') {
+            const available = userOp.insert.length - charCountInCurrentOp;
+            const toTake = Math.min(remaining, available);
+            const text = userOp.insert.substring(charCountInCurrentOp, charCountInCurrentOp + toTake);
+            
+            const attributes = { 
+              ...userOp.attributes, 
+              background: "#fff59d",
+              strike: true
+            };
+            newOps.push({ insert: text, attributes });
+            
+            remaining -= toTake;
+            charCountInCurrentOp += toTake;
+            
+            if (charCountInCurrentOp >= userOp.insert.length) {
+              userOpIndex++;
+              charCountInCurrentOp = 0;
+            }
+          } else {
+            newOps.push(userOp);
+            userOpIndex++;
+          }
+        }
+        
+        // Handle any remaining deletion text with basic formatting
+        if (remaining > 0) {
+          newOps.push({ 
+            insert: str.substring(str.length - remaining), 
+            attributes: { 
+              background: "#fff59d",
+              strike: true
+            } 
+          });
+        }
       }
     }
     
@@ -179,11 +279,12 @@ export default function TrackedQuill({ initial = "Start typing here...", onApply
     const newDelta = new Delta(newOps);
     quillRef.current.setContents(newDelta);
     
-    // Update tracking state - the user can now see LLM suggestions vs original
+    // Update tracking state - the user can now see LLM suggestions vs current content
+    // Set hasEdits to true so Accept/Discard buttons appear for LLM changes
     // Update userContentRef to track what would be the clean content (without diff formatting)
-    userContentRef.current = newContent;
+    userContentRef.current = trimmedNewContent;
     lastDisplayedDiffsRef.current = diffs;
-    setHasEdits(true);
+    setHasEdits(true); // This ensures Accept/Discard buttons show for LLM changes
     applyingRef.current = false;
   };
 
@@ -406,7 +507,7 @@ export default function TrackedQuill({ initial = "Start typing here...", onApply
           insert: str, 
           attributes: { 
             ...originalAttributes,
-            background: "#ffecb3",
+            background: "#fff59d",
             strike: true
           } 
         });
@@ -454,27 +555,44 @@ export default function TrackedQuill({ initial = "Start typing here...", onApply
     // Extract the current user content (non-strikethrough text)
     const currentUserContent = extractUserContent();
     
-    // Compare with original to determine if there are real changes
-    const hasChanged = original !== currentUserContent;
-    setHasEdits(hasChanged);
-
-    // Clear existing timer
-    if (debounceTimerRef.current) {
-      clearTimeout(debounceTimerRef.current);
-    }
-
-    // Determine if this is likely a deletion by checking content length
-    const previousLength = userContentRef.current.length;
-    const currentLength = currentUserContent.length;
-    const isDeletion = currentLength < previousLength;
+    // Auto-update the original content to match user changes (no diff visualization)
+    setOriginal(currentUserContent);
+    userContentRef.current = currentUserContent;
     
-    // Use shorter debounce for deletions to make them feel more responsive
-    const debounceTime = isDeletion ? 10 : 25;
-
-    // Apply formatting with optimized debounce timing
-    debounceTimerRef.current = setTimeout(() => {
-      applyDiffFormatting();
-    }, debounceTime);
+    // Update the original delta to match current clean content
+    const contents = quillRef.current.getContents();
+    if (contents && contents.ops) {
+      const cleanOps: any[] = [];
+      for (const op of contents.ops) {
+        if (typeof op.insert === 'string') {
+          const isStrikethrough = op.attributes && op.attributes.strike;
+          if (!isStrikethrough) {
+            // Keep user formatting, remove only our diff markers
+            if (op.attributes) {
+              const cleanAttributes = { ...op.attributes };
+              delete cleanAttributes.background;
+              delete cleanAttributes.strike;
+              
+              if (Object.keys(cleanAttributes).length > 0) {
+                cleanOps.push({ insert: op.insert, attributes: cleanAttributes });
+              } else {
+                cleanOps.push({ insert: op.insert });
+              }
+            } else {
+              cleanOps.push({ insert: op.insert });
+            }
+          }
+        } else {
+          cleanOps.push(op); // embeds, etc.
+        }
+      }
+      const cleanDelta = new Delta(cleanOps);
+      setOriginalDelta(cleanDelta);
+    }
+    
+    // Clear any visual diff markers since user changes don't need diff visualization
+    lastDisplayedDiffsRef.current = [];
+    setHasEdits(false);
   };
 
   const accept = () => {
@@ -560,22 +678,25 @@ export default function TrackedQuill({ initial = "Start typing here...", onApply
         onTextChange={handleTextChange}
       />
       
-      <div className="flex gap-2">
-        <button 
-          className="px-3 py-1 rounded mr-2 bg-green-600 text-white disabled:opacity-50" 
-          onClick={accept} 
-          disabled={!hasEdits}
-        >
-          Accept
-        </button>
-        <button 
-          className="px-3 py-1 rounded bg-red-600 text-white disabled:opacity-50" 
-          onClick={discard} 
-          disabled={!hasEdits}
-        >
-          Discard
-        </button>
-      </div>
+      {/* Accept/Discard buttons only shown when there are LLM-generated edits to review */}
+      {hasEdits && (
+        <div className="flex gap-2">
+          <button 
+            className="px-3 py-1 rounded mr-2 bg-green-600 text-white disabled:opacity-50" 
+            onClick={accept} 
+            disabled={!hasEdits}
+          >
+            Accept
+          </button>
+          <button 
+            className="px-3 py-1 rounded bg-red-600 text-white disabled:opacity-50" 
+            onClick={discard} 
+            disabled={!hasEdits}
+          >
+            Discard
+          </button>
+        </div>
+      )}
     </div>
   );
 }

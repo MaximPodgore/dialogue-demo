@@ -1,15 +1,15 @@
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,100..1000;1,9..40,100..1000&display=swap');
 @import "tailwindcss";
 
 /* Root color variables kept in sync with tailwind.config.js tokens */
-:root {
-  --page-bg: #FBF8FF;     /* pageBg */
-  --lavender: #F3E8FF;    /* lavender */
-  --placeholder: #F0E9FF; /* placeholder */
-  --card: #FFFFFF;        /* card */
-  --border-color: #E6E1EB;/* border */
-  --muted: #6B7280;       /* muted */
-  --primary: #6B46FF;     /* primary */
-  --foreground: #171717;  /* text */
+@theme {
+  --page-bg: #fcfbf9;     /* pageBg - off-white from palette */
+  --color-lavender: #bfabcc;    /* lavender - light lavender from palette */
+  --color-card: #ffffff;        /* card - pure white for right side */
+  --color-border: #f8f6f3;/* border - subtle gray */
+  --color-muted: #747474;       /* muted - gray from palette */
+  --color-primary: #b43f7f;     /* primary - purple/magenta from palette */
+  --foreground: #000000;  /* text - black from palette */
 }
 
 /* Keep theme variables simple; avoid unknown at-rules */
@@ -20,7 +20,6 @@
 body {
   background: var(--page-bg);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
 }
 
 /* Utility helpers that can be used in non-Tailwind contexts if needed */

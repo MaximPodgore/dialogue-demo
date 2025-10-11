@@ -12,37 +12,37 @@ module.exports = {
   theme: {
     extend: {
       colors: {
-        // Primary purple used for accents (buttons, highlights)
-        primary: {
-          DEFAULT: '#6B46FF',
-          50: '#F7F3FF',
-          100: '#F0E9FF',
-          200: '#D9C8FF',
-          300: '#C0A7FF',
-          400: '#A57CFF',
-          500: '#6B46FF',
-          600: '#5936E6',
-          700: '#4326B3',
-          800: '#341A8A',
-          900: '#2A1266',
+        // Primary purple/magenta used for accents (buttons, highlights)
+        'primary': {
+          DEFAULT: '#b43f7f',
+          50: '#fdf2f8',
+          100: '#fce7f3',
+          200: '#fbcfe8',
+          300: '#f9a8d4',
+          400: '#f472b6',
+          500: '#b43f7f',
+          600: '#a03471',
+          700: '#881c5c',
+          800: '#701a4d',
+          900: '#5a1640',
         },
-        // Soft lavender background seen in the screenshot
-        lavender: '#F3E8FF',
-        // Page background (off-white / very pale lavender)
-        pageBg: '#FBF8FF',
+        // Light gray background
+        'lavender': '#f8f6f3',
+        // Page background (off-white)
+        'pageBg': '#fcfbf9',
         // Card and panel backgrounds (white)
-        card: colors.white,
+        'card': colors.white,
         // Subtle border color between sections
-        border: '#E6E1EB',
+        'border': '#f8f6f3',
         // Muted body text
-        muted: '#6B7280',
-        // Accent / lighter purple used for placeholders and faint fills
-        accent: '#D9C8FF',
+        'muted': '#747474',
+        // Accent / lighter gray used for placeholders and faint fills
+        'accent': '#f8f6f3',
         // Placeholder area color used on the large left panel
-        placeholder: '#F0E9FF',
+        'placeholder': '#f8f6f3',
       },
       fontFamily: {
-        sans: ['Inter', ...defaultTheme.fontFamily.sans],
+        sans: ['DM Sans', ...defaultTheme.fontFamily.sans],
       },
     },
   },

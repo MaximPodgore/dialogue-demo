@@ -41,7 +41,12 @@ deletions- strikethrough and highlighted in yellow
 ## Todo
 
 - [x] Llm diff functionality 
-- [ ] Deletion jank
+- [x] Better styling
+  - [x] Add dm sans font 
+  - [x] Need big placeholder with color and make background color correct 
+  - [x] Make left side only take up 40% hw
 - [ ] Atomic diff/save editing
-- [ ] Tiptap
-- [ ] Better styling
+- [ ] Simplify/clean up js logic
+  - [ ] Try out different string matchers
+  - [ ] Figure out where to put start of llm text if theyre very different
+
