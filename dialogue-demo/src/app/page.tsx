@@ -1,3 +1,5 @@
+import TrackedQuill from "../components/TrackedQuill";
+
 export default function Home() {
   return (
     <main className="p-6 bg-pageBg">
@@ -18,14 +20,9 @@ export default function Home() {
         </section>
         <section className="w-full md:w-1/2 bg-card p-6 rounded-md shadow-sm flex flex-col">
           <h2 className="text-lg font-semibold mb-4 text-primary">Editable</h2>
-          <div
-            contentEditable
-            suppressContentEditableWarning
-            className="w-full h-full min-h-[300px] border border-border rounded p-3 bg-transparent focus:outline-none text-muted flex-1"
-            aria-label="Editable text area"
-            role="textbox"
-          >
-            Start typing here...
+          <div className="w-full h-full min-h-[300px] flex-1">
+            {/* TrackedQuill is a client component that shows insert/delete highlights */}
+            <TrackedQuill initial={"Start typing here..."} />
           </div>
         </section>
       </div>
