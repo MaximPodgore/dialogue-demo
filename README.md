@@ -3,15 +3,23 @@
 
 ## 1st Option - Quill.js
 
-Rich Text editing provided by Quill.js. Features toolbar and delta change functionality
+Rich Text editing with real-time diff visualization using Quill.js. Features toolbar, delta operations, and smart change tracking.
 
-Used diff-match-patch for easy diff tracking.
+TrackedQuill component maintains separate user content and display layers:
+- **User Content**: Extracted from editor, excluding diff markers (strikethrough text)
+- **Display Layer**: Shows diffs with yellow highlighting for additions, strikethrough for deletions
+- **Original State**: Preserved with Delta format for clean restoration
 
-- Onchange, diff-match-patch calculates all changes and then we step through and apply manual styling (doesnt preserve italics and more atm)
+**Change Detection Flow:**
+- Text changes trigger debounced diff calculation (10ms for deletions, 25ms for additions)
+- diff-match-patch compares original vs current user content
+- Diffs applied as formatting overlays while preserving user formatting (bold, italic, etc.)
+- Visual feedback: additions highlighted yellow, deletions shown as yellow strikethrough
 
-- On save, original text var is now replaced with current text. HasEdits is now False
-
-- On discard, current text is set to original text. HasEdits is now False
+**State Management:**
+- Accept: User content becomes new original, diff markers cleared, hasEdits = false
+- Discard: Editor restored to original Delta state, hasEdits = false
+- Smart formatting preservation during diff application and state transitions
 
 
 
@@ -32,7 +40,8 @@ deletions- strikethrough and highlighted in yellow
 
 ## Todo
 
-- Atomic diff/save editing
 - Llm diff functionality 
+- Deletion jank
+- Atomic diff/save editing
 - Tiptap
 - Better styling
