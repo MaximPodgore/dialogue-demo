@@ -1,0 +1,30 @@
+@import "tailwindcss";
+
+/* Root color variables kept in sync with tailwind.config.js tokens */
+:root {
+  --page-bg: #FBF8FF;     /* pageBg */
+  --lavender: #F3E8FF;    /* lavender */
+  --placeholder: #F0E9FF; /* placeholder */
+  --card: #FFFFFF;        /* card */
+  --border-color: #E6E1EB;/* border */
+  --muted: #6B7280;       /* muted */
+  --primary: #6B46FF;     /* primary */
+  --foreground: #171717;  /* text */
+}
+
+/* Keep theme variables simple; avoid unknown at-rules */
+/* Note: system dark-mode overrides removed to keep the demo in the light theme.
+   If you want dark-mode support, reintroduce a media query or use a `.dark` class
+   and toggle it on the `html` element. */
+
+body {
+  background: var(--page-bg);
+  color: var(--foreground);
+  font-family: Arial, Helvetica, sans-serif;
+}
+
+/* Utility helpers that can be used in non-Tailwind contexts if needed */
+.placeholder-panel { background: var(--placeholder); }
+.card-bg { background: var(--card); }
+.muted { color: var(--muted); }
+.border-muted { border-color: var(--border-color); }
