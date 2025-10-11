@@ -14,6 +14,8 @@ export default function Home() {
   const [currentPage, setCurrentPage] = useState<string>(pageNames[0] || "");
   const [pageContents, setPageContents] = useState<Map<string, any>>(new Map());
   const [unsavedPages, setUnsavedPages] = useState<Set<string>>(new Set());
+  const [styleMode, setStyleMode] = useState<'yellow' | 'pink'>('yellow');
+  const [isStyleDropdownOpen, setIsStyleDropdownOpen] = useState(false);
   
   // Store pending edit states per page (for LLM-generated edits that need accept/reject)
   const [pagePendingEdits, setPagePendingEdits] = useState<Map<string, {
@@ -85,7 +87,7 @@ export default function Home() {
   return (
     <main className="bg-pageBg h-screen overflow-hidden">
       <div className="flex flex-col md:flex-row h-full">
-        <section className="w-full md:w-1/2 bg-placeholder p-6 flex flex-col h-full">
+        <section className="w-full md:w-1/2 bg-page-bg p-6 flex flex-col h-full">
           {/* Lavender placeholder box */}
           <div className="bg-lavender border-dotted border-2 border-fuchsia-600 opacity-65 p-8 mb-6 flex-1 flex items-center justify-center min-h-[200px]">
             <span className="text-muted text-lg">placeholder</span>
@@ -94,7 +96,7 @@ export default function Home() {
           <h2 className="text-medium font-semibold mb-4">Get mock LLM response</h2>
 
           {/* Form with white background */}
-          <div className="bg-white rounded-lg p-6 shadow-sm">
+          <div className="bg-card rounded-lg p-6 shadow-sm">
             <form className="space-y-4" onSubmit={handleFormSubmit}>
               <div>
                 <input className="w-full border-border rounded px-3 py-2" name="single" placeholder="Reply to George" type="text" />
@@ -107,9 +109,64 @@ export default function Home() {
             </form>
           </div>
         </section>
-        <section className="w-full md:w-1/2 bg-white p-6 flex flex-col h-full overflow-y-auto">
+        <section className="w-full md:w-1/2 bg-card border-l border-gray-300 p-6 flex flex-col h-full overflow-y-auto relative">
+          {/* Fixed floating action buttons at the top right */}
+          <div className="fixed top-6 right-6 z-50">
+            <div className="flex items-center gap-3">
+              {/* Style selector dropdown */}
+              <div className="relative">
+                <button
+                  onClick={() => setIsStyleDropdownOpen(!isStyleDropdownOpen)}
+                  className="flex items-center gap-2 px-3 py-2 border border-gray-300 rounded-md hover:bg-gray-50 transition-colors bg-white"
+                >
+                  {/* Icon based on selected style */}
+                  <div className={`w-4 h-4 ${styleMode === 'yellow' ? 'bg-yellow-400' : 'bg-primary'} rounded-sm`}></div>
+                  <svg className="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                  </svg>
+                </button>
+                
+                {/* Dropdown menu */}
+                {isStyleDropdownOpen && (
+                  <div className="absolute top-full left-0 mt-1 w-40 bg-white border border-gray-300 rounded-md shadow-lg z-10">
+                    <button
+                      onClick={() => {
+                        setStyleMode('yellow');
+                        setIsStyleDropdownOpen(false);
+                      }}
+                      className="flex items-center gap-2 w-full px-3 py-2 text-left hover:bg-gray-50 transition-colors"
+                    >
+                      <div className="w-4 h-4 bg-yellow-400 rounded-sm"></div>
+                      <span className="text-sm">Yellow highlight</span>
+                    </button>
+                    <button
+                      onClick={() => {
+                        setStyleMode('pink');
+                        setIsStyleDropdownOpen(false);
+                      }}
+                      className="flex items-center gap-2 w-full px-3 py-2 text-left hover:bg-gray-50 transition-colors"
+                    >
+                      <div className="w-4 h-4 bg-primary rounded-sm"></div>
+                      <span className="text-sm text-primary">Pink text</span>
+                    </button>
+                  </div>
+                )}
+              </div>
+              
+              {/* Save button */}
+              <button className="px-4 py-2 border border-gray-300 rounded-md hover:bg-gray-50 transition-colors text-sm font-medium bg-white">
+                Save
+              </button>
+              
+              {/* Publish button */}
+              <button className="px-4 py-2 bg-primary hover:bg-gray-800 text-white rounded-md font-medium text-sm">
+                Publish
+              </button>
+            </div>
+          </div>
+          
           {/* Main document heading and description */}
-          <div className="mb-2">
+          <div className="mb-2 pt-16">
             <h1 className="text-2xl font-bold mb-2">
               {document?.title || "No Document"}
             </h1>
@@ -134,6 +191,7 @@ export default function Home() {
                 pendingEditState={pagePendingEdits.get(currentPage) || null}
                 onApplyNewContent={handleApplyNewContentRegistration}
                 initial={pageToDelta(getDocument(docName)?.pages[currentPage] || { title: '', segments: [] })}
+                styleMode={styleMode}
               />
             ) : (
               <div className="flex items-center justify-center h-full text-gray-500">

@@ -3,7 +3,7 @@
 
 /* Root color variables kept in sync with tailwind.config.js tokens */
 @theme {
-  --page-bg: #fcfbf9;     /* pageBg - off-white from palette */
+  --page-bg: #f0f0f0;     /* pageBg - neutral gray tone from palette */
   --color-lavender: #bfabcc;    /* lavender - light lavender from palette */
   --color-card: #ffffff;        /* card - pure white for right side */
   --color-border: #f8f6f3;/* border - subtle gray */
@@ -22,8 +22,3 @@ body {
   color: var(--foreground);
 }
 
-/* Utility helpers that can be used in non-Tailwind contexts if needed */
-.placeholder-panel { background: var(--placeholder); }
-.card-bg { background: var(--card); }
-.muted { color: var(--muted); }
-.border-muted { border-color: var(--border-color); }

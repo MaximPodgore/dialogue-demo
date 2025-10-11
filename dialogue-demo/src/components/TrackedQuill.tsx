@@ -28,7 +28,8 @@ const initializeQuill = async () => {
 const Editor = forwardRef<any, {
   defaultValue?: any;
   onTextChange?: (...args: any[]) => void;
-}>(({ defaultValue, onTextChange }, ref) => {
+  disabled?: boolean;
+}>(({ defaultValue, onTextChange, disabled }, ref) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const defaultValueRef = useRef(defaultValue);
   const onTextChangeRef = useRef(onTextChange);
@@ -52,8 +53,9 @@ const Editor = forwardRef<any, {
       
       const quill = new QuillClass(editorContainer, {
         theme: 'snow',
+        readOnly: disabled,
         modules: {
-          toolbar: [
+          toolbar: disabled ? false : [
             ["bold", "italic", "underline"], 
             [{ header: [1, 2, false] }], 
             [{ list: "ordered" }, { list: "bullet" }], 
@@ -75,10 +77,17 @@ const Editor = forwardRef<any, {
       }
 
       quill.on(QuillClass.events.TEXT_CHANGE, (...args: any[]) => {
-        if (mounted) {
+        if (mounted && !disabled) {
           onTextChangeRef.current?.(...args);
         }
       });
+
+      // Handle disabled state changes
+      if (disabled) {
+        quill.disable();
+      } else {
+        quill.enable();
+      }
     };
 
     initEditor();
@@ -92,7 +101,18 @@ const Editor = forwardRef<any, {
         containerRef.current.innerHTML = '';
       }
     };
-  }, [ref]);
+  }, [ref, disabled]);
+
+  // Handle disabled state changes after editor is created
+  useEffect(() => {
+    if (ref && typeof ref === 'object' && ref.current) {
+      if (disabled) {
+        ref.current.disable();
+      } else {
+        ref.current.enable();
+      }
+    }
+  }, [disabled, ref]);
 
   return <div ref={containerRef}></div>;
 });
@@ -104,7 +124,7 @@ type Props = {
   currentFile?: string; // Current filename being edited
   fileContents?: Map<string, any>; // Map of filename to current content (including unsaved edits)
   onContentChange?: (filename: string, content: any, hasChanges: boolean) => void; // Notify parent of content changes
-  onApplyNewContent?: (applyFn: (newContent: string) => void) => void;
+  onApplyNewContent?: (applyFn: (newContent: string) => void) => void; // Function to apply LLM content
   onPendingEditStateChange?: (filename: string, pendingState: {
     hasEdits: boolean;
     original: string;
@@ -119,187 +139,130 @@ type Props = {
     lastDisplayedDiffs: any[];
     userContent: string;
   } | null; // Restored pending edit state for current file
+  styleMode?: 'yellow' | 'pink'; // Style mode for LLM diffs
 };
 
 /**
  * TrackedQuill Component
  * 
- * Behavior:
- * - User changes: Automatically accepted, no diff visualization, no Accept/Discard buttons
- * - LLM changes: Show diff visualization with Accept/Discard buttons for review
- * - File switching: Maintains separate edit state for each file
- * 
- * Props:
- * - initial: Can be a string or Delta object for formatted placeholder content
- * - currentFile: Current filename being edited
- * - fileContents: Map of filename to current content (including unsaved edits)
- * - onContentChange: Callback when content changes
+ * Simplified behavior:
+ * - User changes: No tracking, no diff visualization, immediate acceptance
+ * - LLM changes: Show diff visualization with Accept/Discard buttons
+ * - Pending edits: Editor becomes read-only until Accept/Discard is clicked
  */
 export default function TrackedQuill({ 
   initial = "Start typing here...", 
   currentFile, 
   fileContents, 
   onContentChange, 
-  onApplyNewContent, 
+  onApplyNewContent,
   onPendingEditStateChange,
-  pendingEditState 
+  pendingEditState,
+  styleMode = 'yellow'
 }: Props) {
-  // Convert initial to a standardized format and extract plain text
-  const getInitialContent = () => {
-    // If currentFile is provided and we have content for it, use that
-    if (currentFile && fileContents && fileContents.has(currentFile)) {
-      const content = fileContents.get(currentFile);
-      if (content) {
-        // Extract plain text from the delta
-        let text = '';
-        if (content.ops) {
-          for (const op of content.ops) {
-            if (typeof op.insert === 'string') {
-              text += op.insert;
-            }
-          }
-        }
-        return {
-          text: text.replace(/\n$/, ''), // Remove trailing newline if present
-          delta: content
-        };
-      }
-    }
-    
-    // Fallback to initial prop
-    if (typeof initial === 'string') {
-      return {
-        text: initial,
-        delta: null
-      };
-    } else {
-      // If it's a Delta object, extract plain text for comparison purposes
-      let text = '';
-      if (initial && initial.ops) {
-        for (const op of initial.ops) {
-          if (typeof op.insert === 'string') {
-            text += op.insert;
-          }
-        }
-      }
-      return {
-        text: text.replace(/\n$/, ''), // Remove trailing newline if present
-        delta: initial
-      };
-    }
-  };
-
-  const initialContent = getInitialContent();
-  
-  // Initialize state, potentially from restored pending edit state
-  const getInitialStateFromPending = () => {
-    if (pendingEditState) {
-      return {
-        original: pendingEditState.original,
-        originalDelta: pendingEditState.originalDelta,
-        hasEdits: pendingEditState.hasEdits,
-        userContent: pendingEditState.userContent,
-        lastDisplayedDiffs: pendingEditState.lastDisplayedDiffs
-      };
-    }
-    return {
-      original: initialContent.text,
-      originalDelta: initialContent.delta,
-      hasEdits: false,
-      userContent: initialContent.text,
-      lastDisplayedDiffs: []
-    };
-  };
-
-  const initialState = getInitialStateFromPending();
-  const [original, setOriginal] = useState<string>(initialState.original);
-  const [originalDelta, setOriginalDelta] = useState<any>(initialState.originalDelta);
-  const [hasEdits, setHasEdits] = useState(initialState.hasEdits);
-  
-  // Use a ref to access the quill instance directly
   const quillRef = useRef<any>(null);
-  const applyingRef = useRef(false);
-  const debounceTimerRef = useRef<NodeJS.Timeout | null>(null);
-  const switchingFilesRef = useRef(false); // Track when we're switching files
+  const [hasPendingEdits, setHasPendingEdits] = useState(false);
+  const [originalContent, setOriginalContent] = useState<any>(null);
+  const [currentDiffs, setCurrentDiffs] = useState<any[] | null>(null); // Store current diffs for re-styling
+  const isApplyingChangesRef = useRef(false); // Track when we're programmatically updating content
+  const lastNotifiedPendingStateRef = useRef<boolean>(false); // Track last notified pending state
+  const notificationTimeoutRef = useRef<NodeJS.Timeout | null>(null); // Debounce notifications
   
-  // Track the actual user content separate from display content
-  const userContentRef = useRef<string>(initialState.userContent);
-  const lastDisplayedDiffsRef = useRef<any[]>(initialState.lastDisplayedDiffs);
+  // Get initial content for current file
+  const getInitialContent = () => {
+    if (currentFile && fileContents && fileContents.has(currentFile)) {
+      return fileContents.get(currentFile);
+    }
+    return typeof initial === 'string' ? initial : initial;
+  };
 
   // Handle file switching
   useEffect(() => {
     if (!quillRef.current || !currentFile) return;
     
-    switchingFilesRef.current = true; // Prevent notifications during file switch
+    // Reset notification tracking when switching files
+    lastNotifiedPendingStateRef.current = false;
     
-    // Check if we have pending edit state to restore
-    if (pendingEditState) {
+    // Check if we have pending edit state to restore for this file
+    if (pendingEditState && pendingEditState.hasEdits) {
       // Restore pending edit state
-      setOriginal(pendingEditState.original);
-      setOriginalDelta(pendingEditState.originalDelta);
-      setHasEdits(pendingEditState.hasEdits);
-      userContentRef.current = pendingEditState.userContent;
-      lastDisplayedDiffsRef.current = pendingEditState.lastDisplayedDiffs;
-    } else {
-      // No pending edits, use clean content
-      const newContent = getInitialContent();
+      isApplyingChangesRef.current = true;
       
-      // Update state to match new file
-      setOriginal(newContent.text);
-      setOriginalDelta(newContent.delta);
-      setHasEdits(false);
-      userContentRef.current = newContent.text;
-      lastDisplayedDiffsRef.current = [];
-    }
-    
-    // Update editor content
-    applyingRef.current = true;
-    const content = getInitialContent();
-    if (content.delta) {
-      quillRef.current.setContents(content.delta);
-    } else {
-      quillRef.current.setText(content.text);
-    }
-    applyingRef.current = false;
-    
-    // Allow notifications after file switch is complete
-    setTimeout(() => {
-      switchingFilesRef.current = false;
-    }, 0);
-  }, [currentFile, fileContents]);
-
-  // Remove the separate pendingEditState effect to avoid circular dependencies
-
-  // Cleanup timer on unmount
-  useEffect(() => {
-    return () => {
-      if (debounceTimerRef.current) {
-        clearTimeout(debounceTimerRef.current);
+      // Restore the content that has diff formatting
+      if (fileContents && fileContents.has(currentFile)) {
+        const savedContent = fileContents.get(currentFile);
+        quillRef.current.setContents(savedContent);
       }
-    };
-  }, []);
-
-  // Helper function to notify parent of pending edit state changes
-  const notifyPendingEditStateChange = (newHasEdits: boolean) => {
-    if (!currentFile || !onPendingEditStateChange || switchingFilesRef.current) return;
-    
-    if (newHasEdits) {
-      onPendingEditStateChange(currentFile, {
-        hasEdits: newHasEdits,
-        original,
-        originalDelta,
-        lastDisplayedDiffs: lastDisplayedDiffsRef.current,
-        userContent: userContentRef.current
-      });
+      
+      setHasPendingEdits(true);
+      // Reconstruct original content from pending state
+      if (pendingEditState.originalDelta) {
+        setOriginalContent(pendingEditState.originalDelta);
+      }
+      
+      setTimeout(() => {
+        isApplyingChangesRef.current = false;
+      }, 10);
     } else {
-      onPendingEditStateChange(currentFile, null);
+      // No pending edits, load clean content
+      const content = getInitialContent();
+      
+      // Only update if content actually changed to prevent infinite loops
+      const currentText = quillRef.current.getText();
+      const newText = typeof content === 'string' ? content : 
+        (content && content.ops ? content.ops.map((op: any) => typeof op.insert === 'string' ? op.insert : '').join('') : '');
+      
+      if (currentText !== newText) {
+        isApplyingChangesRef.current = true;
+        
+        // Don't store selection for file switching - let cursor go to end naturally
+        if (typeof content === 'string') {
+          quillRef.current.setText(content);
+        } else {
+          quillRef.current.setContents(content);
+        }
+        
+        // Place cursor at the end of content after switching files
+        setTimeout(() => {
+          if (quillRef.current) {
+            const length = quillRef.current.getLength();
+            quillRef.current.setSelection(length - 1, 0);
+          }
+          isApplyingChangesRef.current = false;
+        }, 10);
+      }
+      
+      // Reset pending edits state when switching to files without pending edits
+      setHasPendingEdits(false);
+      setOriginalContent(null);
     }
-  };
+  }, [currentFile, pendingEditState]);
 
-  // Watch for hasEdits changes to notify parent
+  // Initialize content when quill is ready (only once)
   useEffect(() => {
-    notifyPendingEditStateChange(hasEdits);
-  }, [hasEdits, original, originalDelta, currentFile]);
+    if (!quillRef.current) return;
+    
+    isApplyingChangesRef.current = true;
+    const content = getInitialContent();
+    
+    // Only set content if it's actually different from current content
+    const currentText = quillRef.current.getText();
+    const newText = typeof content === 'string' ? content : 
+      (content && content.ops ? content.ops.map((op: any) => typeof op.insert === 'string' ? op.insert : '').join('') : '');
+    
+    if (currentText !== newText) {
+      if (typeof content === 'string') {
+        quillRef.current.setText(content);
+      } else {
+        quillRef.current.setContents(content);
+      }
+    }
+    
+    // Don't set cursor position on initial load, let it be at the end naturally
+    setTimeout(() => {
+      isApplyingChangesRef.current = false;
+    }, 10);
+  }, [quillRef.current]);
 
   // Register the applyNewContent function with parent
   useEffect(() => {
@@ -308,492 +271,400 @@ export default function TrackedQuill({
     }
   }, [onApplyNewContent]);
 
-  const applyNewContent = (newContent: string) => {
-    if (!quillRef.current) return;
-    
-    // Clear any pending formatting timer
-    if (debounceTimerRef.current) {
-      clearTimeout(debounceTimerRef.current);
-      debounceTimerRef.current = null;
+  // Notify parent when pending edit state changes
+  useEffect(() => {
+    if (onPendingEditStateChange && currentFile && !isApplyingChangesRef.current) {
+      // Clear any existing timeout
+      if (notificationTimeoutRef.current) {
+        clearTimeout(notificationTimeoutRef.current);
+      }
+      
+      // Debounce the notification to prevent infinite loops
+      notificationTimeoutRef.current = setTimeout(() => {
+        // Only notify if the pending state actually changed
+        if (hasPendingEdits !== lastNotifiedPendingStateRef.current) {
+          if (hasPendingEdits && originalContent) {
+            const pendingState = {
+              hasEdits: true,
+              original: "",
+              originalDelta: originalContent,
+              lastDisplayedDiffs: [],
+              userContent: ""
+            };
+            onPendingEditStateChange(currentFile, pendingState);
+          } else {
+            onPendingEditStateChange(currentFile, null);
+          }
+          lastNotifiedPendingStateRef.current = hasPendingEdits;
+        }
+      }, 10);
     }
     
-    applyingRef.current = true;
+    return () => {
+      if (notificationTimeoutRef.current) {
+        clearTimeout(notificationTimeoutRef.current);
+      }
+    };
+  }, [hasPendingEdits, originalContent, currentFile, onPendingEditStateChange]);
+
+  // Update diff styling when styleMode changes
+  useEffect(() => {
+    if (!quillRef.current || !hasPendingEdits || !originalContent || !currentDiffs) return;
     
-    // Trim leading whitespace to ensure LLM content starts from the first line
-    const trimmedNewContent = newContent.replace(/^\s+/, '');
+    // Re-apply the current diffs with the new styling
+    reApplyDiffsWithNewStyling();
+  }, [styleMode]);
+
+  // Function to re-apply current diffs with new styling
+  const reApplyDiffsWithNewStyling = () => {
+    if (!quillRef.current || !originalContent || !currentDiffs) return;
     
-    // Compare the new LLM content against the current user content (not original placeholder)
-    const currentUserContent = extractUserContent();
-    const dmp = new DiffMatchPatch();
-    const diffs = dmp.diff_main(currentUserContent, trimmedNewContent);
-    dmp.diff_cleanupSemantic(diffs);
+    isApplyingChangesRef.current = true;
     
-    // Get current content with existing user formatting
-    const currentContents = quillRef.current.getContents();
-    const userOps: any[] = [];
+    // First, get the current content and remove all diff-related styling
+    const currentContent = quillRef.current.getContents();
+    const cleanedOps: any[] = [];
     
-    // Extract existing user content ops (excluding diff markers) to preserve formatting
-    if (currentContents && currentContents.ops) {
-      for (const op of currentContents.ops) {
+    if (currentContent && currentContent.ops) {
+      for (const op of currentContent.ops) {
         if (typeof op.insert === 'string') {
-          const isStrikethrough = op.attributes && op.attributes.strike;
-          if (!isStrikethrough) {
-            // Clean the attributes to remove our diff markers but keep user formatting
-            if (op.attributes) {
-              const cleanAttributes = { ...op.attributes };
-              delete cleanAttributes.background;
-              delete cleanAttributes.strike;
-              
-              if (Object.keys(cleanAttributes).length > 0) {
-                userOps.push({ insert: op.insert, attributes: cleanAttributes });
-              } else {
-                userOps.push({ insert: op.insert });
-              }
-            } else {
-              userOps.push({ insert: op.insert });
+          if (op.attributes) {
+            const cleanAttributes = { ...op.attributes };
+            // Remove all diff-related styling
+            delete cleanAttributes.background;
+            delete cleanAttributes.strike;
+            if (cleanAttributes.color === "#b43f7f") {
+              delete cleanAttributes.color;
             }
+            
+            if (Object.keys(cleanAttributes).length > 0) {
+              cleanedOps.push({ insert: op.insert, attributes: cleanAttributes });
+            } else {
+              cleanedOps.push({ insert: op.insert });
+            }
+          } else {
+            cleanedOps.push({ insert: op.insert });
           }
         } else {
-          userOps.push(op); // embeds, etc.
+          cleanedOps.push(op);
         }
       }
     }
     
-    // Apply the diff formatting while preserving existing user formatting
-    const newOps: any[] = [];
-    let userOpIndex = 0;
-    let charCountInCurrentOp = 0;
+    // Get the clean text content
+    const cleanDelta = new Delta(cleanedOps);
+    const cleanText = cleanDelta.ops?.map((op: any) => 
+      typeof op.insert === 'string' ? op.insert : ''
+    ).join('') || '';
     
-    for (const diff of diffs) {
+    // Now rebuild with current styling mode using the original diffs
+    const newOps: any[] = [];
+    let currentPos = 0;
+    
+    for (const diff of currentDiffs) {
       const type = diff[0];
-      const str = diff[1] as string;
+      const text = diff[1] as string;
       
       if (type === 0) {
-        // Equal: preserve existing user formatting
-        let remaining = str.length;
-        while (remaining > 0 && userOpIndex < userOps.length) {
-          const userOp = userOps[userOpIndex];
-          if (typeof userOp.insert === 'string') {
-            const available = userOp.insert.length - charCountInCurrentOp;
-            const toTake = Math.min(remaining, available);
-            const text = userOp.insert.substring(charCountInCurrentOp, charCountInCurrentOp + toTake);
-            
-            if (userOp.attributes) {
-              newOps.push({ insert: text, attributes: userOp.attributes });
+        // Equal text - preserve existing formatting from original content
+        let remainingLength = text.length;
+        let textStart = currentPos;
+        
+        if (originalContent && originalContent.ops) {
+          let opCharIndex = 0;
+          
+          // Find the ops that contain this text range
+          for (const op of originalContent.ops) {
+            if (typeof op.insert === 'string') {
+              const opLength = op.insert.length;
+              
+              if (opCharIndex + opLength > textStart && remainingLength > 0) {
+                // This op overlaps with our text range
+                const startInOp = Math.max(0, textStart - opCharIndex);
+                const endInOp = Math.min(opLength, textStart + remainingLength - opCharIndex);
+                const takeLength = endInOp - startInOp;
+                
+                if (takeLength > 0) {
+                  const opText = op.insert.substring(startInOp, endInOp);
+                  if (op.attributes) {
+                    newOps.push({ insert: opText, attributes: op.attributes });
+                  } else {
+                    newOps.push({ insert: opText });
+                  }
+                  remainingLength -= takeLength;
+                  textStart += takeLength;
+                }
+              }
+              opCharIndex += opLength;
             } else {
-              newOps.push({ insert: text });
+              // Non-text insert (embed, etc.)
+              if (opCharIndex === textStart && remainingLength > 0) {
+                newOps.push(op);
+              }
+              opCharIndex += 1; // Embeds count as 1 character
             }
-            
-            remaining -= toTake;
-            charCountInCurrentOp += toTake;
-            
-            if (charCountInCurrentOp >= userOp.insert.length) {
-              userOpIndex++;
-              charCountInCurrentOp = 0;
-            }
-          } else {
-            newOps.push(userOp);
-            userOpIndex++;
-          }
-        }
-      } else if (type === 1) {
-        // Insertion: highlight with yellow background, use minimal formatting for new text
-        newOps.push({ insert: str, attributes: { background: "#fff59d" } });
-      } else if (type === -1) {
-        // Deletion: show with strikethrough and highlighting, try to preserve original formatting
-        let remaining = str.length;
-        while (remaining > 0 && userOpIndex < userOps.length) {
-          const userOp = userOps[userOpIndex];
-          if (typeof userOp.insert === 'string') {
-            const available = userOp.insert.length - charCountInCurrentOp;
-            const toTake = Math.min(remaining, available);
-            const text = userOp.insert.substring(charCountInCurrentOp, charCountInCurrentOp + toTake);
-            
-            const attributes = { 
-              ...userOp.attributes, 
-              background: "#fff59d",
-              strike: true
-            };
-            newOps.push({ insert: text, attributes });
-            
-            remaining -= toTake;
-            charCountInCurrentOp += toTake;
-            
-            if (charCountInCurrentOp >= userOp.insert.length) {
-              userOpIndex++;
-              charCountInCurrentOp = 0;
-            }
-          } else {
-            newOps.push(userOp);
-            userOpIndex++;
           }
         }
         
-        // Handle any remaining deletion text with basic formatting
-        if (remaining > 0) {
+        // If we couldn't map all text to existing ops, add remaining as plain text
+        if (remainingLength > 0) {
+          newOps.push({ insert: text.substring(text.length - remainingLength) });
+        }
+        
+        currentPos += text.length;
+      } else if (type === 1) {
+        // Insertion - highlight based on current style mode
+        const insertionAttributes = styleMode === 'yellow' 
+          ? { background: "#fff59d" }
+          : { color: "#b43f7f" };
+        newOps.push({ insert: text, attributes: insertionAttributes });
+        // Don't advance currentPos for insertions
+      } else if (type === -1) {
+        // Deletion - show with strikethrough and highlighting, preserve original formatting
+        let remainingLength = text.length;
+        let textStart = currentPos;
+        
+        if (originalContent && originalContent.ops) {
+          let opCharIndex = 0;
+          
+          // Find the ops that contain this text range
+          for (const op of originalContent.ops) {
+            if (typeof op.insert === 'string') {
+              const opLength = op.insert.length;
+              
+              if (opCharIndex + opLength > textStart && remainingLength > 0) {
+                // This op overlaps with our text range
+                const startInOp = Math.max(0, textStart - opCharIndex);
+                const endInOp = Math.min(opLength, textStart + remainingLength - opCharIndex);
+                const takeLength = endInOp - startInOp;
+                
+                if (takeLength > 0) {
+                  const opText = op.insert.substring(startInOp, endInOp);
+                  const deletionAttributes = styleMode === 'yellow'
+                    ? {
+                        ...op.attributes,
+                        background: "#fff59d",
+                        strike: true
+                      }
+                    : {
+                        ...op.attributes,
+                        color: "#b43f7f",
+                        strike: true
+                      };
+                  newOps.push({ insert: opText, attributes: deletionAttributes });
+                  remainingLength -= takeLength;
+                  textStart += takeLength;
+                }
+              }
+              opCharIndex += opLength;
+            }
+          }
+        }
+        
+        // If we couldn't map all text to existing ops, add remaining with basic deletion formatting
+        if (remainingLength > 0) {
+          const deletionAttributes = styleMode === 'yellow'
+            ? { background: "#fff59d", strike: true }
+            : { color: "#b43f7f", strike: true };
           newOps.push({ 
-            insert: str.substring(str.length - remaining), 
-            attributes: { 
-              background: "#fff59d",
-              strike: true
-            } 
+            insert: text.substring(text.length - remainingLength), 
+            attributes: deletionAttributes
           });
         }
+        
+        currentPos += text.length;
       }
     }
     
-    // Apply the new content with diff formatting
     const newDelta = new Delta(newOps);
     quillRef.current.setContents(newDelta);
     
-    // Update tracking state - the user can now see LLM suggestions vs current content
-    // Set hasEdits to true so Accept/Discard buttons appear for LLM changes
-    // Update userContentRef to track what would be the clean content (without diff formatting)
-    userContentRef.current = trimmedNewContent;
-    lastDisplayedDiffsRef.current = diffs;
-    setHasEdits(true); // This ensures Accept/Discard buttons show for LLM changes
-    
-    // Store the diff-formatted content in parent's fileContents for restoration
-    if (currentFile && onContentChange) {
-      onContentChange(currentFile, newDelta, true); // hasChanges = true for pending edits
-    }
-    
-    applyingRef.current = false;
+    setTimeout(() => {
+      isApplyingChangesRef.current = false;
+    }, 10);
   };
 
-  // Initialize originalDelta when quill is ready
-  useEffect(() => {
-    if (quillRef.current && !originalDelta) {
-      // Set initial content - use Delta if provided, otherwise plain text
-      if (initialContent.delta) {
-        quillRef.current.setContents(initialContent.delta);
-        setOriginalDelta(initialContent.delta);
-      } else {
-        quillRef.current.setText(original);
-        // Ensure no background or strike formatting is present in the initial delta
-        const length = quillRef.current.getLength();
-        if (length > 0) {
-          quillRef.current.formatText(0, length, "background", false);
-          quillRef.current.formatText(0, length, "strike", false);
-        }
-        setOriginalDelta(quillRef.current.getContents());
-      }
-      userContentRef.current = original;
-      lastDisplayedDiffsRef.current = [];
-    }
-  }, [quillRef.current, original, originalDelta, initialContent]);
-
-  // Extract user content (non-strikethrough text) from editor
-  const extractUserContent = (): string => {
-    if (!quillRef.current) return "";
+  const applyNewContent = (newContent: string) => {
+    if (!quillRef.current) return;
     
-    const contents = quillRef.current.getContents();
-    let userText = "";
+    isApplyingChangesRef.current = true;
     
-    if (contents && contents.ops) {
-      for (const op of contents.ops) {
-        if (typeof op.insert === 'string') {
-          const isStrikethrough = op.attributes && op.attributes.strike;
-          if (!isStrikethrough) {
-            userText += op.insert;
-          }
-        }
-      }
-    }
+    // Store current content before applying LLM changes
+    const currentContent = quillRef.current.getContents();
+    setOriginalContent(currentContent);
     
-    return userText.replace(/\n$/, "");
-  };
-
-  const applyDiffFormatting = () => {
-    if (!quillRef.current || applyingRef.current) return;
+    // Get current text content
+    const currentText = quillRef.current.getText().replace(/\n$/, '');
     
-    // Store current selection
-    const selection = quillRef.current.getSelection();
+    // Trim leading whitespace from new content
+    const trimmedNewContent = newContent.replace(/^\s+/, '');
     
-    // Get current user content
-    const currentUserContent = extractUserContent();
-    userContentRef.current = currentUserContent;
-    
-    const a = original;
-    const b = currentUserContent;
-
-    applyingRef.current = true;
-
-    if (a === b) {
-      // No changes - preserve user formatting, just remove diff markers
-      const contents = quillRef.current.getContents();
-      if (contents && contents.ops) {
-        const cleanOps = contents.ops.map((op: any) => {
-          if (op.attributes) {
-            const cleanAttributes = { ...op.attributes };
-            delete cleanAttributes.background;
-            delete cleanAttributes.strike;
-            
-            if (Object.keys(cleanAttributes).length > 0) {
-              return { ...op, attributes: cleanAttributes };
-            } else {
-              return { insert: op.insert };
-            }
-          }
-          return op;
-        }).filter((op: any) => !(op.attributes && op.attributes.strike)); // Remove strikethrough ops entirely
-        
-        const cleanDelta = new Delta(cleanOps);
-        quillRef.current.setContents(cleanDelta);
-        if (selection) {
-          quillRef.current.setSelection(selection.index, selection.length);
-        }
-      }
-      
-      lastDisplayedDiffsRef.current = [];
-      applyingRef.current = false;
-      return;
-    }
-
+    // Create diff between current text and new LLM content
     const dmp = new DiffMatchPatch();
-    const diffs = dmp.diff_main(a, b);
+    const diffs = dmp.diff_main(currentText, trimmedNewContent);
     dmp.diff_cleanupSemantic(diffs);
-
-    // Check if diffs actually changed
-    const diffsChanged = JSON.stringify(diffs) !== JSON.stringify(lastDisplayedDiffsRef.current);
-    if (!diffsChanged) {
-      applyingRef.current = false;
-      return;
-    }
-
-    // Get the current content with user formatting preserved
-    const contents = quillRef.current.getContents();
-    const userOps: any[] = [];
     
-    // Extract user content ops (excluding strikethrough)
-    if (contents && contents.ops) {
-      for (const op of contents.ops) {
-        if (typeof op.insert === 'string') {
-          const isStrikethrough = op.attributes && op.attributes.strike;
-          if (!isStrikethrough) {
-            // Clean the attributes to remove our diff markers but keep user formatting
-            if (op.attributes) {
-              const cleanAttributes = { ...op.attributes };
-              delete cleanAttributes.background;
-              delete cleanAttributes.strike;
-              
-              if (Object.keys(cleanAttributes).length > 0) {
-                userOps.push({ insert: op.insert, attributes: cleanAttributes });
-              } else {
-                userOps.push({ insert: op.insert });
-              }
-            } else {
-              userOps.push({ insert: op.insert });
-            }
-          }
-        } else {
-          userOps.push(op); // embeds, etc.
-        }
-      }
-    }
-
-    // Now apply diff formatting to the clean user content
+    // Store the diffs for potential re-styling
+    setCurrentDiffs(diffs);
+    
+    // Build new ops while preserving existing formatting
     const newOps: any[] = [];
-    let userOpIndex = 0;
-    let charCountInCurrentOp = 0;
+    let currentPos = 0;
     
     for (const diff of diffs) {
       const type = diff[0];
-      const str = diff[1] as string;
+      const text = diff[1] as string;
       
       if (type === 0) {
-        // Equal: keep with original user formatting
-        let remaining = str.length;
-        while (remaining > 0 && userOpIndex < userOps.length) {
-          const userOp = userOps[userOpIndex];
-          if (typeof userOp.insert === 'string') {
-            const available = userOp.insert.length - charCountInCurrentOp;
-            const toTake = Math.min(remaining, available);
-            const text = userOp.insert.substring(charCountInCurrentOp, charCountInCurrentOp + toTake);
-            
-            if (userOp.attributes) {
-              newOps.push({ insert: text, attributes: userOp.attributes });
-            } else {
-              newOps.push({ insert: text });
-            }
-            
-            remaining -= toTake;
-            charCountInCurrentOp += toTake;
-            
-            if (charCountInCurrentOp >= userOp.insert.length) {
-              userOpIndex++;
-              charCountInCurrentOp = 0;
-            }
-          } else {
-            newOps.push(userOp);
-            userOpIndex++;
-          }
-        }
-      } else if (type === 1) {
-        // Insertion: highlight with yellow background, preserve user formatting
-        let remaining = str.length;
-        while (remaining > 0 && userOpIndex < userOps.length) {
-          const userOp = userOps[userOpIndex];
-          if (typeof userOp.insert === 'string') {
-            const available = userOp.insert.length - charCountInCurrentOp;
-            const toTake = Math.min(remaining, available);
-            const text = userOp.insert.substring(charCountInCurrentOp, charCountInCurrentOp + toTake);
-            
-            const attributes = { ...userOp.attributes, background: "#fff59d" };
-            newOps.push({ insert: text, attributes });
-            
-            remaining -= toTake;
-            charCountInCurrentOp += toTake;
-            
-            if (charCountInCurrentOp >= userOp.insert.length) {
-              userOpIndex++;
-              charCountInCurrentOp = 0;
-            }
-          } else {
-            newOps.push(userOp);
-            userOpIndex++;
-          }
-        }
-      } else if (type === -1) {
-        // Deletion: show with strikethrough and highlighting, preserving original formatting
-        // Use a simpler approach: track the position and get formatting from original delta
-        let originalPos = 0;
-        for (let i = 0; i < diffs.indexOf(diff); i++) {
-          const prevDiff = diffs[i];
-          if (prevDiff[0] !== 1) { // Not an insertion
-            originalPos += prevDiff[1].length;
-          }
-        }
+        // Equal text - preserve existing formatting
+        let remainingLength = text.length;
+        let textStart = currentPos;
         
-        // Try to get the dominant formatting from the original position
-        let originalAttributes = {};
-        if (originalDelta && originalDelta.ops) {
-          let pos = 0;
-          for (const op of originalDelta.ops) {
+        if (currentContent && currentContent.ops) {
+          let opIndex = 0;
+          let opCharIndex = 0;
+          
+          // Find the ops that contain this text range
+          for (const op of currentContent.ops) {
             if (typeof op.insert === 'string') {
-              if (pos <= originalPos && originalPos < pos + op.insert.length) {
-                originalAttributes = op.attributes || {};
-                break;
+              const opLength = op.insert.length;
+              
+              if (opCharIndex + opLength > textStart && remainingLength > 0) {
+                // This op overlaps with our text range
+                const startInOp = Math.max(0, textStart - opCharIndex);
+                const endInOp = Math.min(opLength, textStart + remainingLength - opCharIndex);
+                const takeLength = endInOp - startInOp;
+                
+                if (takeLength > 0) {
+                  const opText = op.insert.substring(startInOp, endInOp);
+                  if (op.attributes) {
+                    newOps.push({ insert: opText, attributes: op.attributes });
+                  } else {
+                    newOps.push({ insert: opText });
+                  }
+                  remainingLength -= takeLength;
+                  textStart += takeLength;
+                }
               }
-              pos += op.insert.length;
+              opCharIndex += opLength;
+            } else {
+              // Non-text insert (embed, etc.)
+              if (opCharIndex === textStart && remainingLength > 0) {
+                newOps.push(op);
+              }
+              opCharIndex += 1; // Embeds count as 1 character
             }
           }
         }
         
-        // Apply deletion formatting while preserving original attributes
-        newOps.push({ 
-          insert: str, 
-          attributes: { 
-            ...originalAttributes,
-            background: "#fff59d",
-            strike: true
-          } 
-        });
+        // If we couldn't map all text to existing ops, add remaining as plain text
+        if (remainingLength > 0) {
+          newOps.push({ insert: text.substring(text.length - remainingLength) });
+        }
+        
+        currentPos += text.length;
+      } else if (type === 1) {
+        // Insertion - highlight based on style mode
+        const insertionAttributes = styleMode === 'yellow' 
+          ? { background: "#fff59d" }
+          : { color: "#b43f7f" }; // Using the primary pink color
+        newOps.push({ insert: text, attributes: insertionAttributes });
+        // Don't advance currentPos for insertions
+      } else if (type === -1) {
+        // Deletion - show with strikethrough and highlighting, preserve original formatting
+        let remainingLength = text.length;
+        let textStart = currentPos;
+        
+        if (currentContent && currentContent.ops) {
+          let opCharIndex = 0;
+          
+          // Find the ops that contain this text range
+          for (const op of currentContent.ops) {
+            if (typeof op.insert === 'string') {
+              const opLength = op.insert.length;
+              
+              if (opCharIndex + opLength > textStart && remainingLength > 0) {
+                // This op overlaps with our text range
+                const startInOp = Math.max(0, textStart - opCharIndex);
+                const endInOp = Math.min(opLength, textStart + remainingLength - opCharIndex);
+                const takeLength = endInOp - startInOp;
+                
+                if (takeLength > 0) {
+                  const opText = op.insert.substring(startInOp, endInOp);
+                  const deletionAttributes = styleMode === 'yellow'
+                    ? {
+                        ...op.attributes,
+                        background: "#fff59d",
+                        strike: true
+                      }
+                    : {
+                        ...op.attributes,
+                        color: "#b43f7f",
+                        strike: true
+                      };
+                  newOps.push({ insert: opText, attributes: deletionAttributes });
+                  remainingLength -= takeLength;
+                  textStart += takeLength;
+                }
+              }
+              opCharIndex += opLength;
+            }
+          }
+        }
+        
+        // If we couldn't map all text to existing ops, add remaining with basic deletion formatting
+        if (remainingLength > 0) {
+          const deletionAttributes = styleMode === 'yellow'
+            ? { background: "#fff59d", strike: true }
+            : { color: "#b43f7f", strike: true };
+          newOps.push({ 
+            insert: text.substring(text.length - remainingLength), 
+            attributes: deletionAttributes
+          });
+        }
+        
+        currentPos += text.length;
       }
     }
-
-    // Apply the new content
+    
     const newDelta = new Delta(newOps);
-    const currentContents = quillRef.current.getContents();
-    const diff = currentContents.diff(newDelta);
+    quillRef.current.setContents(newDelta);
     
-    if (diff && diff.ops && diff.ops.length > 0) {
-      const hasOnlyFormattingChanges = diff.ops.every((op: any) => 
-        !op.insert || (typeof op.insert === 'string' && op.insert.length === 0) || 
-        (op.attributes && Object.keys(op.attributes).some((key: string) => 
-          ['background', 'strike', 'color'].includes(key)
-        ))
-      );
-      
-      if (hasOnlyFormattingChanges) {
-        quillRef.current.updateContents(diff);
-      } else {
-        quillRef.current.setContents(newDelta);
+    // Set pending edits state
+    setHasPendingEdits(true);
+    
+    // Notify parent of content change with a delay to prevent loops
+    setTimeout(() => {
+      if (currentFile && onContentChange) {
+        onContentChange(currentFile, newDelta, true);
       }
-    }
-    
-    // Restore selection
-    if (selection) {
-      const newLength = quillRef.current.getLength();
-      const safeIndex = Math.min(selection.index, newLength - 1);
-      const safeLength = Math.min(selection.length, newLength - safeIndex);
-      
-      if (quillRef.current && !applyingRef.current) {
-        quillRef.current.setSelection(Math.max(0, safeIndex), safeLength);
-      }
-    }
-    
-    lastDisplayedDiffsRef.current = diffs;
-    applyingRef.current = false;
+      isApplyingChangesRef.current = false;
+    }, 10);
   };
 
+  // Handle text changes - only allow editing non-pending text
   const handleTextChange = (...args: any[]) => {
-    if (!quillRef.current || applyingRef.current) return;
+    if (!quillRef.current || hasPendingEdits || isApplyingChangesRef.current) return;
     
-    // Extract the current user content (non-strikethrough text)
-    const currentUserContent = extractUserContent();
+    // For non-pending edits, just update content normally
+    const content = quillRef.current.getContents();
     
-    // Auto-update the original content to match user changes (no diff visualization)
-    setOriginal(currentUserContent);
-    userContentRef.current = currentUserContent;
-    
-    // Update the original delta to match current clean content
-    const contents = quillRef.current.getContents();
-    if (contents && contents.ops) {
-      const cleanOps: any[] = [];
-      for (const op of contents.ops) {
-        if (typeof op.insert === 'string') {
-          const isStrikethrough = op.attributes && op.attributes.strike;
-          if (!isStrikethrough) {
-            // Keep user formatting, remove only our diff markers
-            if (op.attributes) {
-              const cleanAttributes = { ...op.attributes };
-              delete cleanAttributes.background;
-              delete cleanAttributes.strike;
-              
-              if (Object.keys(cleanAttributes).length > 0) {
-                cleanOps.push({ insert: op.insert, attributes: cleanAttributes });
-              } else {
-                cleanOps.push({ insert: op.insert });
-              }
-            } else {
-              cleanOps.push({ insert: op.insert });
-            }
-          }
-        } else {
-          cleanOps.push(op); // embeds, etc.
-        }
+    // Use setTimeout to avoid infinite update loops
+    setTimeout(() => {
+      if (currentFile && onContentChange && !isApplyingChangesRef.current) {
+        const text = quillRef.current.getText().replace(/\n$/, '');
+        const hasChanges = text !== (typeof initial === 'string' ? initial : '');
+        onContentChange(currentFile, content, hasChanges);
       }
-      const cleanDelta = new Delta(cleanOps);
-      setOriginalDelta(cleanDelta);
-      
-      // Notify parent of content change
-      if (currentFile && onContentChange) {
-        const hasChanges = currentUserContent !== original;
-        onContentChange(currentFile, cleanDelta, hasChanges);
-      }
-    }
-    
-    // Clear any visual diff markers since user changes don't need diff visualization
-    lastDisplayedDiffsRef.current = [];
-    setHasEdits(false);
+    }, 0);
   };
 
   const accept = () => {
-    if (!quillRef.current) return;
+    if (!quillRef.current || !hasPendingEdits) return;
     
-    // Clear any pending formatting timer
-    if (debounceTimerRef.current) {
-      clearTimeout(debounceTimerRef.current);
-      debounceTimerRef.current = null;
-    }
+    isApplyingChangesRef.current = true;
     
-    applyingRef.current = true;
-    
-    // Get the current user content and clean formatting
-    const finalContent = extractUserContent();
-    
-    // Get current content and remove only diff markers, keeping user formatting
+    // Remove diff formatting and keep the final content
     const contents = quillRef.current.getContents();
     const cleanOps: any[] = [];
     
@@ -802,10 +673,14 @@ export default function TrackedQuill({
         if (typeof op.insert === 'string') {
           const isStrikethrough = op.attributes && op.attributes.strike;
           if (!isStrikethrough) {
-            // Keep user formatting, remove only our diff markers
+            // Remove diff highlighting but keep other formatting
             if (op.attributes) {
               const cleanAttributes = { ...op.attributes };
               delete cleanAttributes.background;
+              // Only remove pink color if it's the diff color
+              if (cleanAttributes.color === "#b43f7f") {
+                delete cleanAttributes.color;
+              }
               delete cleanAttributes.strike;
               
               if (Object.keys(cleanAttributes).length > 0) {
@@ -818,7 +693,7 @@ export default function TrackedQuill({
             }
           }
         } else {
-          cleanOps.push(op); // embeds, etc.
+          cleanOps.push(op);
         }
       }
     }
@@ -826,73 +701,71 @@ export default function TrackedQuill({
     const cleanDelta = new Delta(cleanOps);
     quillRef.current.setContents(cleanDelta);
     
-    // Update our tracking variables
-    setOriginal(finalContent);
-    setOriginalDelta(cleanDelta);
-    userContentRef.current = finalContent;
-    lastDisplayedDiffsRef.current = [];
-    setHasEdits(false);
+    setHasPendingEdits(false);
+    setOriginalContent(null);
+    setCurrentDiffs(null); // Clear stored diffs
     
-    // Notify parent of content change
-    if (currentFile && onContentChange) {
-      const hasChanges = finalContent !== original;
-      onContentChange(currentFile, cleanDelta, hasChanges);
-    }
-    
-    applyingRef.current = false;
+    // Use setTimeout to prevent infinite loops
+    setTimeout(() => {
+      if (currentFile && onContentChange) {
+        onContentChange(currentFile, cleanDelta, true);
+      }
+      isApplyingChangesRef.current = false;
+    }, 10);
   };
 
   const discard = () => {
-    if (!quillRef.current || !originalDelta) return;
+    if (!quillRef.current || !originalContent) return;
     
-    // Clear any pending formatting timer
-    if (debounceTimerRef.current) {
-      clearTimeout(debounceTimerRef.current);
-      debounceTimerRef.current = null;
-    }
+    isApplyingChangesRef.current = true;
     
-    applyingRef.current = true;
+    // Restore original content
+    quillRef.current.setContents(originalContent);
     
-    // Restore the original content with all its formatting
-    quillRef.current.setContents(originalDelta);
-    userContentRef.current = original;
-    lastDisplayedDiffsRef.current = [];
-    setHasEdits(false);
+    setHasPendingEdits(false);
+    setOriginalContent(null);
+    setCurrentDiffs(null); // Clear stored diffs
     
-    // Notify parent of content restoration
-    if (currentFile && onContentChange) {
-      const hasChanges = false; // When discarding, we're back to original
-      onContentChange(currentFile, originalDelta, hasChanges);
-    }
-    
-    applyingRef.current = false;
+    // Use setTimeout to prevent infinite loops
+    setTimeout(() => {
+      if (currentFile && onContentChange) {
+        onContentChange(currentFile, originalContent, false);
+      }
+      isApplyingChangesRef.current = false;
+    }, 10);
   };
 
   return (
     <div className="flex flex-col gap-2">
-      <Editor
-        ref={quillRef}
-        defaultValue={initialContent.delta || original}
-        onTextChange={handleTextChange}
-      />
+      <div className="[&_.ql-container]:!border-none [&_.ql-toolbar]:!border-none [&_.ql-toolbar]:!border-b [&_.ql-toolbar]:!border-gray-200 [&_.ql-editor]:!border-none">
+        <Editor
+          ref={quillRef}
+          defaultValue={getInitialContent()}
+          onTextChange={handleTextChange}
+          disabled={hasPendingEdits}
+        />
+      </div>
       
-      {/* Accept/Discard buttons only shown when there are LLM-generated edits to review */}
-      {hasEdits && (
+      {hasPendingEdits && (
         <div className="flex gap-2">
           <button 
-            className="px-3 py-1 rounded mr-2 bg-green-600 text-white disabled:opacity-50" 
-            onClick={accept} 
-            disabled={!hasEdits}
+            className="px-3 py-1 rounded mr-2 bg-green-600 text-white" 
+            onClick={accept}
           >
             Accept
           </button>
           <button 
-            className="px-3 py-1 rounded bg-red-600 text-white disabled:opacity-50" 
-            onClick={discard} 
-            disabled={!hasEdits}
+            className="px-3 py-1 rounded bg-red-600 text-white" 
+            onClick={discard}
           >
             Discard
           </button>
+        </div>
+      )}
+      
+      {hasPendingEdits && (
+        <div className="text-sm text-gray-600 bg-yellow-50 p-2 rounded">
+          Editor is read-only while LLM changes are pending. Accept or discard to continue editing.
         </div>
       )}
     </div>

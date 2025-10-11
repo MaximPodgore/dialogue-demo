@@ -48,12 +48,13 @@ deletions- strikethrough and highlighted in yellow
 - [x] Better default text for plan and llm response
 - [x] How to make the placeholders store formatting
 - [x] toggling multipage edits
-- [ ] Big save button on top
-- [ ] ui toggle between highlight/pink text
+- [x] Big save button on top
+- [x] ui toggle between highlight/pink text
+- [x] Remove quill component box styling
 - [ ] Atomic diff/save functionality +ui
-- [ ] Remove quill component box styling
 - [ ] Simplify/clean up js logic
 - [ ] Try out different string matchers
 - [ ] Version history far down the road, but possible since I'm tracking and updating all edits
 - [ ] Figure out logic on where to put start of llm text if theyre very different
+- [ ] LLM inline comment capabilities
 

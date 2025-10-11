@@ -32,8 +32,6 @@ module.exports = {
         'pageBg': '#fcfbf9',
         // Card and panel backgrounds (white)
         'card': colors.white,
-        // Subtle border color between sections
-        'border': '#f8f6f3',
         // Muted body text
         'muted': '#747474',
         // Accent / lighter gray used for placeholders and faint fills
