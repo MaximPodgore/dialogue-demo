@@ -101,9 +101,10 @@ Editor.displayName = 'Editor';
 
 type Props = {
   initial?: string;
+  onApplyNewContent?: (applyFn: (newContent: string) => void) => void;
 };
 
-export default function TrackedQuill({ initial = "Start typing here..." }: Props) {
+export default function TrackedQuill({ initial = "Start typing here...", onApplyNewContent }: Props) {
   const [original, setOriginal] = useState<string>(initial);
   const [originalDelta, setOriginalDelta] = useState<any>(null);
   const [hasEdits, setHasEdits] = useState(false);
@@ -125,6 +126,66 @@ export default function TrackedQuill({ initial = "Start typing here..." }: Props
       }
     };
   }, []);
+
+  // Register the applyNewContent function with parent
+  useEffect(() => {
+    if (onApplyNewContent) {
+      onApplyNewContent(applyNewContent);
+    }
+  }, [onApplyNewContent]);
+
+  const applyNewContent = (newContent: string) => {
+    if (!quillRef.current) return;
+    
+    // Clear any pending formatting timer
+    if (debounceTimerRef.current) {
+      clearTimeout(debounceTimerRef.current);
+      debounceTimerRef.current = null;
+    }
+    
+    applyingRef.current = true;
+    
+    // Compare the new LLM content against the original text (not current user content)
+    const dmp = new DiffMatchPatch();
+    const diffs = dmp.diff_main(original, newContent);
+    dmp.diff_cleanupSemantic(diffs);
+    
+    // Apply the diff formatting to show what the LLM is suggesting vs the original
+    const newOps: any[] = [];
+    
+    for (const diff of diffs) {
+      const type = diff[0];
+      const str = diff[1] as string;
+      
+      if (type === 0) {
+        // Equal: no formatting (text that stays the same)
+        newOps.push({ insert: str });
+      } else if (type === 1) {
+        // Insertion: highlight with yellow background (LLM added this)
+        newOps.push({ insert: str, attributes: { background: "#fff59d" } });
+      } else if (type === -1) {
+        // Deletion: show with strikethrough and highlighting (LLM removed this from original)
+        newOps.push({ 
+          insert: str, 
+          attributes: { 
+            background: "#ffecb3",
+            strike: true
+          } 
+        });
+      }
+    }
+    
+    // Apply the new content with diff formatting
+    const newDelta = new Delta(newOps);
+    quillRef.current.setContents(newDelta);
+    
+    // Update tracking state - the user can now see LLM suggestions vs original
+    // Update userContentRef to track what would be the clean content (without diff formatting)
+    userContentRef.current = newContent;
+    lastDisplayedDiffsRef.current = diffs;
+    setHasEdits(true);
+    applyingRef.current = false;
+  };
 
   // Initialize originalDelta when quill is ready
   useEffect(() => {

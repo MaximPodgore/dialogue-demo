@@ -40,8 +40,8 @@ deletions- strikethrough and highlighted in yellow
 
 ## Todo
 
-- Llm diff functionality 
-- Deletion jank
-- Atomic diff/save editing
-- Tiptap
-- Better styling
+- [x] Llm diff functionality 
+- [ ] Deletion jank
+- [ ] Atomic diff/save editing
+- [ ] Tiptap
+- [ ] Better styling
