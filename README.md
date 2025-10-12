@@ -50,9 +50,13 @@ deletions- strikethrough and highlighted in yellow
 - [x] toggling multipage edits
 - [x] Big save button on top
 - [x] ui toggle between highlight/pink text
+  - [x] make it clean
 - [x] Remove quill component box styling
+- [x] Make file title and description editable
 - [ ] Atomic diff/save functionality +ui
 - [ ] Simplify/clean up js logic
+- [ ] New sections button, plus old sections editable
+- [ ] Mobile view
 - [ ] Try out different string matchers
 - [ ] Version history far down the road, but possible since I'm tracking and updating all edits
 - [ ] Figure out logic on where to put start of llm text if theyre very different
