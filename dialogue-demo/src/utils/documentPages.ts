@@ -6,6 +6,7 @@ export interface ContentSegment {
     bold?: boolean;
     italic?: boolean;
     underline?: boolean;
+    strike?: boolean;
     size?: string;
     color?: string;
     background?: string;
@@ -65,4 +66,85 @@ export const pageToDelta = (page: DocumentPage) => {
     };
   });
   return { ops };
+};
+
+// Convert DocumentPage directly to Tiptap JSON format
+export const pageToTiptap = (page: DocumentPage) => {
+  if (!page || !page.segments) {
+    return {
+      type: 'doc',
+      content: [
+        {
+          type: 'paragraph',
+          content: []
+        }
+      ]
+    };
+  }
+
+  const content: any[] = [];
+  let currentParagraph: any = {
+    type: 'paragraph',
+    content: []
+  };
+
+  for (const segment of page.segments) {
+    const text = segment.text;
+    const lines = text.split('\n');
+    
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i];
+      
+      if (line.length > 0) {
+        const marks: any[] = [];
+        
+        if (segment.attributes) {
+          if (segment.attributes.bold) marks.push({ type: 'bold' });
+          if (segment.attributes.italic) marks.push({ type: 'italic' });
+          if (segment.attributes.underline) marks.push({ type: 'underline' });
+          if (segment.attributes.strike) marks.push({ type: 'strike' });
+          if (segment.attributes.color) marks.push({ type: 'textStyle', attrs: { color: segment.attributes.color } });
+          if (segment.attributes.background) marks.push({ type: 'highlight', attrs: { color: segment.attributes.background } });
+          if (segment.attributes.header) {
+            // Convert header to heading
+            currentParagraph = {
+              type: `heading${segment.attributes.header}`,
+              content: []
+            };
+          }
+        }
+        
+        currentParagraph.content.push({
+          type: 'text',
+          text: line,
+          ...(marks.length > 0 && { marks })
+        });
+      }
+      
+      // Add line break or new paragraph
+      if (i < lines.length - 1) {
+        if (currentParagraph.content.length > 0) {
+          content.push(currentParagraph);
+        }
+        currentParagraph = {
+          type: 'paragraph',
+          content: []
+        };
+      }
+    }
+  }
+  
+  if (currentParagraph.content.length > 0) {
+    content.push(currentParagraph);
+  }
+  
+  return {
+    type: 'doc',
+    content: content.length > 0 ? content : [
+      {
+        type: 'paragraph',
+        content: []
+      }
+    ]
+  };
 };

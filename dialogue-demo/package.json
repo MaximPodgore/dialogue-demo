@@ -8,11 +8,18 @@
     "start": "next start"
   },
   "dependencies": {
+    "@tiptap/extension-color": "^3.6.6",
+    "@tiptap/extension-highlight": "^3.6.6",
+    "@tiptap/extension-link": "^3.6.6",
+    "@tiptap/extension-text-style": "^3.6.6",
+    "@tiptap/react": "^3.6.6",
+    "@tiptap/starter-kit": "^3.6.6",
     "diff-match-patch": "^1.0.5",
     "next": "15.5.4",
     "quill": "^2.0.3",
     "react": "19.1.0",
-    "react-dom": "19.1.0"
+    "react-dom": "19.1.0",
+    "tiptap": "^1.32.2"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",

@@ -1,9 +1,9 @@
 "use client";
 
 import { useRef, useState } from "react";
-import TrackedQuill from "../components/TrackedQuill";
+import TiptapEditor from "../components/TiptapEditor";
 import DocumentPageTabs from "../components/DocumentPageTabs";
-import { getDocument, getPageNames, pageToDelta } from "../utils/documentPages";
+import { getDocument, getPageNames, pageToTiptap } from "../utils/documentPages";
 import mockResponse from "../data/mock-llm-response.json";
 
 export default function Home() {
@@ -21,7 +21,7 @@ export default function Home() {
   const [pagePendingEdits, setPagePendingEdits] = useState<Map<string, {
     hasEdits: boolean;
     original: string;
-    originalDelta: any;
+    originalContent: any;
     lastDisplayedDiffs: any[];
     userContent: string;
   }>>(new Map());
@@ -53,7 +53,7 @@ export default function Home() {
   const handlePendingEditStateChange = (pageName: string, pendingState: {
     hasEdits: boolean;
     original: string;
-    originalDelta: any;
+    originalContent: any;
     lastDisplayedDiffs: any[];
     userContent: string;
   } | null) => {
@@ -210,14 +210,14 @@ export default function Home() {
           {/* Editor for current page */}
           <div className="w-full h-full min-h-[300px] flex-1">
             {currentPage ? (
-              <TrackedQuill
+              <TiptapEditor
                 currentFile={currentPage}
                 fileContents={pageContents}
                 onContentChange={handleContentChange}
                 onPendingEditStateChange={handlePendingEditStateChange}
                 pendingEditState={pagePendingEdits.get(currentPage) || null}
                 onApplyNewContent={handleApplyNewContentRegistration}
-                initial={pageToDelta(getDocument(docName)?.pages[currentPage] || { title: '', segments: [] })}
+                initial={pageToTiptap(getDocument(docName)?.pages[currentPage] || { title: '', segments: [] })}
                 styleMode={styleMode}
               />
             ) : (
