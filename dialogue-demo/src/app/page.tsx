@@ -2,13 +2,28 @@
 
 import { useState } from "react";
 import ProseMirrorDemo from "@/components/ProseMirrorDemo";
-import DocumentPageTabs from "../components/DocumentPageTabs";
-import { getDocument, getPageNames, pageToTiptap } from "../utils/documentPages";
-import mockResponse from "../data/mock-llm-response.json";
+import { TextSuggestion } from "@/components/proseMirror";
+
 
 export default function Home() {
     const [styleMode, setStyleMode] = useState<'yellow' | 'pink'>('yellow');
     const [isStyleDropdownOpen, setIsStyleDropdownOpen] = useState(false);
+    const [suggestions, setSuggestions] = useState<TextSuggestion[]>([]);
+    const [form, setForm] = useState<TextSuggestion>({
+      textToReplace: 'This is a background that George generated for the study. This should give someone a good idea of the reasons behind this study.',
+      textReplacement: 'This background provides context and rationale for the study, helping readers understand its purpose.',
+      reason: 'Clarified the background for better readability and professionalism.',
+      textBefore: 'Background',
+      textAfter: 'Hypothetically should this text be editable at all ?',
+    });
+    const handleFormChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+      setForm({ ...form, [e.target.name]: e.target.value });
+    };
+    const handleSuggestionSubmit = (e: React.FormEvent<HTMLFormElement>) => {
+      e.preventDefault();
+      setSuggestions([...suggestions, form]);
+      setForm({ textToReplace: '', textReplacement: '', reason: '', textBefore: '', textAfter: '' });
+    };
     // Will use later for llm stuff
     //   const getMockLLMResponse = () => {
     //     return mockResponse.response;
@@ -24,9 +39,81 @@ export default function Home() {
     <main className="bg-pageBg h-screen overflow-hidden">
       <div className="flex flex-col md:flex-row h-full">
         <section className="w-full md:w-1/2 bg-page-bg p-6 flex flex-col h-full">
-          {/* Lavender placeholder box */}
-          <div className="bg-lavender border-dotted border-2 border-fuchsia-600 opacity-65 p-8 mb-6 flex-1 flex items-center justify-center min-h-[200px]">
-            <span className="text-muted text-lg">placeholder</span>
+
+          {/* Structured Suggestion Form */}
+          <div className="bg-card rounded-lg shadow-sm  p-8 mb-6 flex-1 flex flex-col items-center justify-center min-h-[200px]">
+            <form className="w-full max-w-lg space-y-4" onSubmit={handleSuggestionSubmit}>
+              <h2 className="text-lg font-bold mb-2">Add a Suggestion</h2>
+              <div>
+                <label className="block text-sm font-medium mb-1">Text to Replace</label>
+                <textarea name="textToReplace" value={form.textToReplace} onChange={handleFormChange} className="w-full border rounded px-3 py-2 resize-vertical" required placeholder="This is a background that George generated for the study. This should give someone a good idea of the reasons behind this study. Hypothetically should this text be editable at all ?" rows={4} style={{minHeight:'120px',overflowWrap:'break-word'}} />
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-1">Text Replacement</label>
+                <textarea name="textReplacement" value={form.textReplacement} onChange={handleFormChange} className="w-full border rounded px-3 py-2 resize-vertical" required placeholder="This background provides context and rationale for the study, helping readers understand its purpose." rows={2} style={{minHeight:'48px',overflowWrap:'break-word'}} />
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-1">Reason</label>
+                <textarea name="reason" value={form.reason} onChange={handleFormChange} className="w-full border rounded px-3 py-2 resize-vertical" required placeholder="Clarified the background for better readability and professionalism." rows={2} style={{minHeight:'48px',overflowWrap:'break-word'}} />
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-1">Text Before</label>
+                <textarea name="textBefore" value={form.textBefore} onChange={handleFormChange} className="w-full border rounded px-3 py-2 resize-vertical" placeholder="Background" rows={1} style={{minHeight:'32px',overflowWrap:'break-word'}} />
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-1">Text After</label>
+                <textarea name="textAfter" value={form.textAfter} onChange={handleFormChange} className="w-full border rounded px-3 py-2 resize-vertical" placeholder="Objectives" rows={1} style={{minHeight:'32px',overflowWrap:'break-word'}} />
+              </div>
+              <div className="flex flex-col items-end gap-2">
+                <button type="submit" className="p-3 bg-black hover:bg-gray-800 text-white rounded-md font-small">Add Suggestion</button>
+                <button
+                  type="button"
+                  className="p-3 bg-black hover:bg-gray-800 text-white rounded-md font-small"
+                  onClick={() => {
+                    const defaultSuggestions = [
+                      {
+                        textToReplace: 'This is a background that George generated for the study. This should give someone a good idea of the reasons behind this study. Hypothetically should this text be editable at all ?',
+                        textReplacement: 'This background provides context and rationale for the study, helping readers understand its purpose.',
+                        reason: 'George: Clarified the background for better readability and professionalism.',
+                        textBefore: 'Background',
+                        textAfter: 'Objectives'
+                      },
+                      {
+                        textToReplace: 'This are objectives that George generated for the study. This should give someone a good idea of the goals behind this study. Hypothetically should this text be editable at all ? Hmmm.',
+                        textReplacement: 'These objectives outline the specific goals of the study, providing clear direction for the research.',
+                        reason: 'George: Improved grammar and clarified the objectives section.',
+                        textBefore: 'Objectives',
+                        textAfter: 'This is text for the first objective'
+                      },
+                      {
+                        textToReplace: 'This is text for the first objective',
+                        textReplacement: 'Objective 1: Increase user engagement by 20% over 3 months.',
+                        reason: 'George: Made the objective more specific and measurable.',
+                        textBefore: 'Objectives',
+                        textAfter: 'This is text for the second objective'
+                      },
+                      {
+                        textToReplace: 'This is text for the second objective',
+                        textReplacement: 'Objective 2: Collect feedback from at least 100 participants.',
+                        reason: 'George: Added clarity and a measurable target.',
+                        textBefore: 'This is text for the first objective',
+                        textAfter: 'This is text for the third objective'
+                      },
+                      {
+                        textToReplace: 'This is text for the third objective',
+                        textReplacement: 'Objective 3: Analyze the impact of the new methodology.',
+                        reason: 'George: Made the objective actionable and relevant.',
+                        textBefore: 'This is text for the second objective',
+                        textAfter: 'Methodology'
+                      }
+                    ];
+                    setSuggestions([...suggestions, ...defaultSuggestions]);
+                  }}
+                >
+                  Add default suggestions to the prose component
+                </button>
+              </div>
+            </form>
           </div>
 
           {/* Form with white background */}
@@ -140,7 +227,7 @@ export default function Home() {
             onSelect={handlePageSelect}
           />
           {/* Editor for current page */}
-            <ProseMirrorDemo />
+            <ProseMirrorDemo initialSuggestions={suggestions} />
         </section>
       </div>
     </main>
