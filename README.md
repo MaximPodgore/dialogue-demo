@@ -26,8 +26,9 @@ Uses ProseMirror plus [suggestion-mode package](https://github.com/davefowler/pr
 - [x] LLM form
 - [x] uneditable titles (bolded text)
 - [x] React form validation
-- [ ] New form suggestion logic
+- [ ] Form's field logic
 - [x] Change some ui/ux elements
+- [ ] Form to suggestion logic
 - [ ] suggestion pop stays on click (actually really hard)
 
 
