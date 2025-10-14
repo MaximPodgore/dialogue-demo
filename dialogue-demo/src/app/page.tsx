@@ -133,7 +133,7 @@ export default function Home() {
             </form>
           </div>
         </section>
-        <section className="w-full md:w-1/2 bg-card border-l border-gray-300 p-6 flex flex-col h-full overflow-y-auto relative">
+  <section className="w-full md:w-1/2 bg-card border-l border-gray-300 flex flex-col h-full overflow-y-auto relative px-10">
           {/* Fixed floating action buttons at the top right */}
           <div className="fixed top-6 right-6 z-50">
             <div className="flex items-center gap-3">
@@ -205,7 +205,7 @@ export default function Home() {
           </div>
           
           {/* Main document heading, description, and prose editor aligned with reduced left padding */}
-          <div className="flex flex-col items-start w-full max-w-2xl mx-auto pt-16 pl-1.5" >
+          <div className="flex flex-col items-start w-full pt-16" >
             <div 
               className="text-2xl font-bold mb-2 focus:outline-none"
               contentEditable
