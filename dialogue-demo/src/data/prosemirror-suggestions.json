@@ -1,0 +1,91 @@
+{
+  "Landing_Page_AB_Test": {
+    "General_Information": [
+      {
+        "textToReplace": "study",
+        "textReplacement": "research project",
+        "reason": "More specific terminology",
+        "textBefore": "This is a background for the ",
+        "textAfter": ". This should give someone"
+      },
+      {
+        "textToReplace": "Hypothetically should this text be editable at all?",
+        "textReplacement": "This content is fully editable and collaborative.",
+        "reason": "Clearer statement about editability",
+        "textBefore": "reasons behind the study.",
+        "textAfter": "Objectives"
+      },
+      {
+        "textToReplace": "These are objectives for the study",
+        "textReplacement": "The primary objectives of this research",
+        "reason": "More formal language",
+        "textBefore": "Objectives",
+        "textAfter": ". This should give someone"
+      },
+      {
+        "textToReplace": "Lorem ipsum",
+        "textReplacement": "Placeholder Text",
+        "reason": "Replace Latin with English heading",
+        "textBefore": "est laborum.",
+        "textAfter": "Lorem ipsum dolor sit"
+      }
+    ],
+    "Methodology": [
+      {
+        "textToReplace": "comprehensive approach",
+        "textReplacement": "systematic methodology",
+        "reason": "More precise language",
+        "textBefore": "follows a ",
+        "textAfter": " designed to ensure"
+      },
+      {
+        "textToReplace": "Data collection",
+        "textReplacement": "Information gathering",
+        "reason": "Simplified terminology",
+        "textBefore": "",
+        "textAfter": "will be conducted through"
+      }
+    ],
+    "Audience": [
+      {
+        "textToReplace": "Executive Summary",
+        "textReplacement": "Overview",
+        "reason": "More accessible heading",
+        "textBefore": "",
+        "textAfter": "This comprehensive study"
+      },
+      {
+        "textToReplace": "significant step forward",
+        "textReplacement": "major advancement",
+        "reason": "Stronger language",
+        "textBefore": "represents a ",
+        "textAfter": " in understanding"
+      }
+    ],
+    "Screeners": [
+      {
+        "textToReplace": "Literature Review",
+        "textReplacement": "Background Research",
+        "reason": "More accessible terminology",
+        "textBefore": "",
+        "textAfter": "The existing body"
+      },
+      {
+        "textToReplace": "Several key themes emerge",
+        "textReplacement": "Key patterns become evident",
+        "reason": "Clearer language",
+        "textBefore": "research studies. ",
+        "textAfter": " from the review"
+      }
+    ],
+    "Sections": [
+      {
+        "textToReplace": "Additional Content",
+        "textReplacement": "Supplementary Information",
+        "reason": "More formal heading",
+        "textBefore": "",
+        "textAfter": "This section contains"
+      }
+    ]
+  }
+}
