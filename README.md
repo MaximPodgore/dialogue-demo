@@ -25,12 +25,11 @@ Uses ProseMirror plus [suggestion-mode package](https://github.com/davefowler/pr
 - [x] Atomic diff/save functionality +ui
 - [x] LLM form
 - [x] uneditable titles (bolded text)
-- [ ] React form validation
-- [ ] suggestion pop stays on click (actually really hard)
-
-
-
-- [ ] Text size option support
+- [x] React form validation
+- [ ] suggestion pop stays on click (actually really hard)?
+- [ ] Logic and abstraction clean up?
+- [ ] Redo multipage?
+- [ ] Toolbar?
 - [ ] Version history far down the road, but possible since I'm tracking and updating all edits
 
 
