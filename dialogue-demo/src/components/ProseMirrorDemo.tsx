@@ -1,17 +1,12 @@
 "use client";
-import React from 'react';
+import React, { useState } from 'react';
 import SuggestionEditor, { TextSuggestion } from './proseMirror';
-
-interface ProseMirrorDemoProps {
-  initialSuggestions?: TextSuggestion[];
-}
+import { getBoldSectionsText } from '@/utils/sectionUtils';
 
 interface ProseMirrorDemoProps {
   initialSuggestions?: TextSuggestion[];
   styleMode: 'yellow' | 'pink';
 }
-
-import { useState } from 'react';
 
 const MIN_TEXT_LENGTH = 2;
 const MAX_TEXT_LENGTH = 5;
@@ -38,55 +33,6 @@ const ProseMirrorDemo: React.FC<ProseMirrorDemoProps> = ({ initialSuggestions, s
   const [toast, setToast] = useState<string | null>(null);
   const [editorContent, setEditorContent] = useState<string>(initialContent);
   const [isPressed, setIsPressed] = useState(false);
-
-  // Only validate on button click
-
-  // Recursively walk DOM to extract bold sections and their following content
-  const getBoldSectionsText = (html: string) => {
-    const parser = new window.DOMParser();
-    const doc = parser.parseFromString(html, 'text/html');
-    const sections: { title: string; text: string }[] = [];
-  let currentTitle: string | null = null;
-    let currentText = '';
-
-    // Helper to walk nodes in order
-    function walk(node: Node) {
-      if (node.nodeType === 1 && ((node as HTMLElement).tagName === 'B' || (node as HTMLElement).tagName === 'STRONG')) {
-        if (currentTitle !== null) {
-          sections.push({ title: currentTitle, text: currentText.trim() });
-        }
-        currentTitle = node.textContent || '';
-        currentText = '';
-      } else {
-        if (currentTitle !== null) {
-          if (node.nodeType === 3) {
-            currentText += node.textContent || '';
-          } else if (node.nodeType === 1) {
-            // Recursively walk children
-            for (let i = 0; i < node.childNodes.length; i++) {
-              walk(node.childNodes[i]);
-            }
-            // Add a space after block elements
-            if (["P","DIV","LI","BR"].includes((node as HTMLElement).tagName)) {
-              currentText += ' ';
-            }
-          }
-        } else {
-          // If not in a bold section, keep walking children
-          if (node.nodeType === 1) {
-            for (let i = 0; i < node.childNodes.length; i++) {
-              walk(node.childNodes[i]);
-            }
-          }
-        }
-      }
-    }
-    walk(doc.body);
-    if (currentTitle !== null) {
-      sections.push({ title: currentTitle, text: currentText.trim() });
-    }
-    return sections;
-  };
 
   const handleValidate = () => {
     setIsPressed(true);

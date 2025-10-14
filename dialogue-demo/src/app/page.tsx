@@ -1,72 +1,174 @@
 "use client";
 
-import { useState } from "react";
+import React, { useState } from "react";
+
 import ProseMirrorDemo from "@/components/ProseMirrorDemo";
 import { TextSuggestion } from "@/components/proseMirror";
-
+import { getBoldSectionsText } from "@/utils/sectionUtils";
 
 export default function Home() {
-    const [styleMode, setStyleMode] = useState<'yellow' | 'pink'>('yellow');
-    const [isStyleDropdownOpen, setIsStyleDropdownOpen] = useState(false);
-    const [suggestions, setSuggestions] = useState<TextSuggestion[]>([]);
-    const [form, setForm] = useState<TextSuggestion>({
-      textToReplace: 'This is a background that George generated for the study. This should give someone a good idea of the reasons behind this study.',
-      textReplacement: 'This background provides context and rationale for the study, helping readers understand its purpose.',
-      reason: 'Clarified the background for better readability and professionalism.',
-      textBefore: 'Background',
-      textAfter: 'Hypothetically should this text be editable at all ?',
-    });
-    const handleFormChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
-      setForm({ ...form, [e.target.name]: e.target.value });
-    };
-    const handleSuggestionSubmit = (e: React.FormEvent<HTMLFormElement>) => {
-      e.preventDefault();
-      setSuggestions([...suggestions, form]);
-      setForm({ textToReplace: '', textReplacement: '', reason: '', textBefore: '', textAfter: '' });
-    };
-    // Will use later for llm stuff
-    //   const getMockLLMResponse = () => {
-    //     return mockResponse.response;
-    //   };
-    
-    //   const handleFormSubmit = (e: React.FormEvent) => {
-    //     e.preventDefault();
-    //     const llmText = getMockLLMResponse();
-    //     setPendingLLMContent(llmText);
-    //   };
+  const [styleMode, setStyleMode] = useState<'yellow' | 'pink'>('yellow');
+  const [isStyleDropdownOpen, setIsStyleDropdownOpen] = useState(false);
+  const [suggestions, setSuggestions] = useState<TextSuggestion[]>([]);
+  // Selected field (section title)
+  const [field, setField] = useState('');
+  // Current value (readonly)
+  const [currentValue, setCurrentValue] = useState('');
+  // New value (editable)
+  const [newValue, setNewValue] = useState('');
+  // Store editor content for section extraction
+  const [editorContent, setEditorContent] = useState<string>('');
+  // Section titles and text
+  const [sectionOptions, setSectionOptions] = useState<{ title: string; text: string }[]>([]);
+
+  // Initial content from ProseMirrorDemo
+  const initialContent = `
+    <b>Background</b>
+    <p>This is a background that George generated for the study. This should give someone a good idea of the reasons behind this study.<br>
+    Hypothetically should this text be editable at all ?</p>
+    <br />
+    <b>Objectives</b>
+    <p>This are objectives that George generated for the study. This should give someone a good idea of the goals behind this study. Hypothetically should this text be editable at all ? Hmmm.</p>
+    <ol>
+      <li>This is text for the first objective</li>
+      <li>This is text for the second objective</li>
+      <li>This is text for the third objective</li>
+    </ol>
+    <br />
+    <b>Methodology</b>
+    <p>Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum</p>
+  `;
+
+  // Populate sectionOptions on initial render
+  React.useEffect(() => {
+    const sections = getBoldSectionsText(initialContent);
+    setSectionOptions(sections);
+    if (sections.length > 0) {
+      setField(sections[0].title);
+      setCurrentValue(sections[0].text);
+      setNewValue(sections[0].text);
+    }
+  }, []);
+
+  // Handler for content change from ProseMirrorDemo
+  const handleEditorContentChange = (content: string) => {
+    setEditorContent(content);
+    // Update section options whenever editor content changes
+    const sections = getBoldSectionsText(content);
+    setSectionOptions(sections);
+    // If field is set, update currentValue and newValue to match new section text
+    if (sections.length > 0) {
+      const selected = sections.find(s => s.title === field) || sections[0];
+      setField(selected.title);
+      setCurrentValue(selected.text);
+      setNewValue(selected.text);
+    }
+  };
+
+  // When field changes, update newValue to current section text
+  const handleFieldChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    const selectedTitle = e.target.value;
+    setField(selectedTitle);
+    // Find section text
+    const section = sectionOptions.find(s => s.title === selectedTitle);
+    const text = section ? section.text : '';
+    setCurrentValue(text);
+    setNewValue(text);
+  };
+
+  const handleSuggestionSubmit = (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    setSuggestions([
+      ...suggestions,
+      {
+        textToReplace: field,
+        textReplacement: newValue,
+        reason: 'Not George:',
+        textBefore: '',
+        textAfter: '',
+      },
+    ]);
+    // Do not clear the form fields after submission
+  };
+  // Will use later for llm stuff
+  //   const getMockLLMResponse = () => {
+  //     return mockResponse.response;
+  //   };
+  
+  //   const handleFormSubmit = (e: React.FormEvent) => {
+  //     e.preventDefault();
+  //     const llmText = getMockLLMResponse();
+  //     setPendingLLMContent(llmText);
+  //   };
 
   return (
     <main className="bg-pageBg h-screen overflow-hidden">
       <div className="flex flex-col md:flex-row h-full">
         <section className="w-full md:w-1/2 bg-page-bg p-6 flex flex-col h-full">
 
-          {/* Structured Suggestion Form */}
-          <div className="bg-card rounded-lg shadow-sm  p-8 mb-6 flex-1 flex flex-col items-center justify-center min-h-[200px]">
+          {/* Custom Suggestion Form (matches provided design) */}
+          <div className="bg-card rounded-lg shadow-sm p-8 mb-6 flex-1 flex flex-col items-center justify-center min-h-[200px]">
             <form className="w-full max-w-lg space-y-4" onSubmit={handleSuggestionSubmit}>
-              <h2 className="text-lg font-bold mb-2">Add a Suggestion</h2>
+              <h2 className="text-lg font-bold mb-2">Add a Suggestion </h2>
+              <p>(backend logic not done)</p>
               <div>
-                <label className="block text-sm font-medium mb-1">Text to Replace</label>
-                <textarea name="textToReplace" value={form.textToReplace} onChange={handleFormChange} className="w-full border rounded px-3 py-2 resize-vertical" required placeholder="This is a background that George generated for the study. This should give someone a good idea of the reasons behind this study. Hypothetically should this text be editable at all ?" rows={4} style={{minHeight:'120px',overflowWrap:'break-word'}} />
+                <label className="block text-sm font-medium mb-1">Field</label>
+                <select
+                  name="field"
+                  value={field}
+                  onChange={handleFieldChange}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-white text-left hover:bg-gray-50 transition-colors focus:outline-none font-medium text-sm "
+                  required
+                >
+                  {sectionOptions.map(section => (
+                    <option key={section.title} value={section.title}>{section.title}</option>
+                  ))}
+                </select>
               </div>
               <div>
-                <label className="block text-sm font-medium mb-1">Text Replacement</label>
-                <textarea name="textReplacement" value={form.textReplacement} onChange={handleFormChange} className="w-full border rounded px-3 py-2 resize-vertical" required placeholder="This background provides context and rationale for the study, helping readers understand its purpose." rows={2} style={{minHeight:'48px',overflowWrap:'break-word'}} />
+                <label className="block text-sm font-medium mb-1">Current Value</label>
+                <textarea
+                  name="currentValue"
+                  value={currentValue}
+                  readOnly
+                  className="w-full text-black resize-none focus:outline-none"
+                  rows={1}
+                  style={{ minHeight: '48px', overflowWrap: 'break-word' }}
+                  ref={el => {
+                    if (el) {
+                      el.style.height = 'auto';
+                      el.style.height = el.scrollHeight + 'px';
+                    }
+                  }}
+                />
               </div>
               <div>
-                <label className="block text-sm font-medium mb-1">Reason</label>
-                <textarea name="reason" value={form.reason} onChange={handleFormChange} className="w-full border rounded px-3 py-2 resize-vertical" required placeholder="Clarified the background for better readability and professionalism." rows={2} style={{minHeight:'48px',overflowWrap:'break-word'}} />
-              </div>
-              <div>
-                <label className="block text-sm font-medium mb-1">Text Before</label>
-                <textarea name="textBefore" value={form.textBefore} onChange={handleFormChange} className="w-full border rounded px-3 py-2 resize-vertical" placeholder="Background" rows={1} style={{minHeight:'32px',overflowWrap:'break-word'}} />
-              </div>
-              <div>
-                <label className="block text-sm font-medium mb-1">Text After</label>
-                <textarea name="textAfter" value={form.textAfter} onChange={handleFormChange} className="w-full border rounded px-3 py-2 resize-vertical" placeholder="Objectives" rows={1} style={{minHeight:'32px',overflowWrap:'break-word'}} />
+                <label className="block text-sm font-medium mb-1">New Value</label>
+                <textarea
+                  name="newValue"
+                  value={newValue}
+                  onChange={e => {
+                    setNewValue(e.target.value);
+                    if (e.target) {
+                      e.target.style.height = 'auto';
+                      e.target.style.height = e.target.scrollHeight + 'px';
+                    }
+                  }}
+                  className="w-full border rounded px-3 py-2 resize-none focus:outline-none"
+                  required
+                  placeholder="The new value for the field"
+                  rows={1}
+                  style={{ minHeight: '48px', overflowWrap: 'break-word' }}
+                  ref={el => {
+                    if (el) {
+                      el.style.height = 'auto';
+                      el.style.height = el.scrollHeight + 'px';
+                    }
+                  }}
+                />
               </div>
               <div className="flex flex-col items-end gap-2">
                 <button type="submit" className="p-3 bg-black hover:bg-gray-800 text-white rounded-md font-small">Add Suggestion</button>
-                
               </div>
             </form>
           </div>
@@ -122,13 +224,10 @@ export default function Home() {
                     setSuggestions([...suggestions, ...defaultSuggestions]);
                   }}
                 >
-                  Add default/non-form suggestions to the prose component
-                </button>
-                {/* <button type="submit" className="p-3 bg-gray-900 hover:bg-gray-800 text-white rounded-md font-small">
                   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />
                   </svg>
-                </button> */}
+                </button>
               </div>
             </form>
           </div>
@@ -224,12 +323,19 @@ export default function Home() {
             </div>
             {/* Editor for current page */}
             <div className="w-full focus-outline-none" >
-              <ProseMirrorDemo initialSuggestions={suggestions} styleMode={styleMode} />
+              <ProseMirrorDemo
+                initialSuggestions={suggestions}
+                styleMode={styleMode}
+                // Pass content change handler to update section options
+                // @ts-ignore: ProseMirrorDemo does not declare onContentChange prop, but SuggestionEditor does
+                onContentChange={handleEditorContentChange}
+              />
             </div>
           </div>
         </section>
       </div>
     </main>
+
   );
 }
 
