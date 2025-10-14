@@ -1,88 +1,24 @@
 "use client";
 
-import { useRef, useState } from "react";
-import TiptapEditor from "../components/TiptapEditor";
+import { useState } from "react";
+import ProseMirrorDemo from "@/components/ProseMirrorDemo";
 import DocumentPageTabs from "../components/DocumentPageTabs";
 import { getDocument, getPageNames, pageToTiptap } from "../utils/documentPages";
 import mockResponse from "../data/mock-llm-response.json";
 
 export default function Home() {
-  const applyNewContentRef = useRef<((newContent: string) => void) | null>(null);
-  const docName = "Landing_Page_AB_Test";
-  const document = getDocument(docName);
-  const pageNames = getPageNames(docName);
-  const [currentPage, setCurrentPage] = useState<string>(pageNames[0] || "");
-  const [pageContents, setPageContents] = useState<Map<string, any>>(new Map());
-  const [unsavedPages, setUnsavedPages] = useState<Set<string>>(new Set());
-  const [styleMode, setStyleMode] = useState<'yellow' | 'pink'>('yellow');
-  const [isStyleDropdownOpen, setIsStyleDropdownOpen] = useState(false);
-  
-  // Store pending edit states per page (for LLM-generated edits that need accept/reject)
-  const [pagePendingEdits, setPagePendingEdits] = useState<Map<string, {
-    hasEdits: boolean;
-    original: string;
-    originalContent: any;
-    lastDisplayedDiffs: any[];
-    userContent: string;
-  }>>(new Map());
-
-  // Handle tab selection
-  const handlePageSelect = (pageName: string) => {
-    setCurrentPage(pageName);
-  };
-
-  // Handle content changes in TrackedQuill
-  const handleContentChange = (pageName: string, content: any, hasChanges: boolean) => {
-    setPageContents(prev => {
-      const newMap = new Map(prev);
-      newMap.set(pageName, content);
-      return newMap;
-    });
-    setUnsavedPages(prev => {
-      const newSet = new Set(prev);
-      if (hasChanges) {
-        newSet.add(pageName);
-      } else {
-        newSet.delete(pageName);
-      }
-      return newSet;
-    });
-  };
-
-  // Handle pending edit state changes (for LLM-generated edits)
-  const handlePendingEditStateChange = (pageName: string, pendingState: {
-    hasEdits: boolean;
-    original: string;
-    originalContent: any;
-    lastDisplayedDiffs: any[];
-    userContent: string;
-  } | null) => {
-    setPagePendingEdits(prev => {
-      const newMap = new Map(prev);
-      if (pendingState) {
-        newMap.set(pageName, pendingState);
-      } else {
-        newMap.delete(pageName);
-      }
-      return newMap;
-    });
-  };
-
-  const getMockLLMResponse = () => {
-    return mockResponse.response;
-  };
-
-  const handleFormSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    const llmText = getMockLLMResponse();
-    if (applyNewContentRef.current) {
-      applyNewContentRef.current(llmText);
-    }
-  };
-
-  const handleApplyNewContentRegistration = (applyFn: (newContent: string) => void) => {
-    applyNewContentRef.current = applyFn;
-  };
+    const [styleMode, setStyleMode] = useState<'yellow' | 'pink'>('yellow');
+    const [isStyleDropdownOpen, setIsStyleDropdownOpen] = useState(false);
+    // Will use later for llm stuff
+    //   const getMockLLMResponse = () => {
+    //     return mockResponse.response;
+    //   };
+    
+    //   const handleFormSubmit = (e: React.FormEvent) => {
+    //     e.preventDefault();
+    //     const llmText = getMockLLMResponse();
+    //     setPendingLLMContent(llmText);
+    //   };
 
   return (
     <main className="bg-pageBg h-screen overflow-hidden">
@@ -95,7 +31,7 @@ export default function Home() {
 
           {/* Form with white background */}
           <div className="bg-card rounded-lg p-6 shadow-sm">
-            <form className="space-y-4" onSubmit={handleFormSubmit}>
+            <form className="space-y-4">
               <div>
                 <input className="w-full border-border rounded px-3 py-2 focus:outline-none focus:border-transparent" name="single" placeholder="Ask George (get a mock response)" type="text" />
               </div>
@@ -116,7 +52,7 @@ export default function Home() {
               {/* Style selector dropdown */}
               <div className="relative">
                 <button
-                  onClick={() => setIsStyleDropdownOpen(!isStyleDropdownOpen)}
+                   onClick={() => setIsStyleDropdownOpen(!isStyleDropdownOpen)}
                   className="flex items-center gap-2 px-3 py-2 border border-gray-300 rounded-md hover:bg-gray-50 transition-colors bg-white"
                 >
                   {/*George icon */}
@@ -124,11 +60,7 @@ export default function Home() {
                     <path d="M0 0 C4.62 0 9.24 0 14 0 C14.33 18.15 14.66 36.3 15 55 C27.54 42.46 40.08 29.92 53 17 C54.65 18.32 56.3 19.64 58 21 C58 21.66 58 22.32 58 23 C58.639375 23.2475 59.27875 23.495 59.9375 23.75 C62 25 62 25 62.83409119 26.83746338 C63 29 63 29 61.71559143 30.88568115 C60.72630898 31.85830902 60.72630898 31.85830902 59.71704102 32.85058594 C58.97619766 33.59105164 58.23535431 34.33151733 57.47206116 35.09442139 C56.65757004 35.88310608 55.84307892 36.67179077 55.00390625 37.484375 C54.18123764 38.29996887 53.35856903 39.11556274 52.51097107 39.95587158 C49.87294754 42.56583985 47.21809526 45.15792426 44.5625 47.75 C42.77425751 49.51317443 40.98713284 51.27748335 39.20117188 53.04296875 C34.81561757 57.37755194 30.40776621 61.68754829 26 66 C43.16 66.33 60.32 66.66 78 67 C78 71.95 78 76.9 78 82 C60.84 82.33 43.68 82.66 26 83 C38.26053663 96.11914278 38.26053663 96.11914278 50.8125 108.9375 C51.58658203 109.71544922 52.36066406 110.49339844 53.15820312 111.29492188 C53.89619141 112.03162109 54.63417969 112.76832031 55.39453125 113.52734375 C56.36676636 114.49788696 56.36676636 114.49788696 57.35864258 115.48803711 C58.9414371 117.08616271 58.9414371 117.08616271 61 118 C60.45015228 121.87511727 58.72444669 123.59576506 55.9375 126.25 C55.20402344 126.95640625 54.47054687 127.6628125 53.71484375 128.390625 C53.14894531 128.92171875 52.58304688 129.4528125 52 130 C48.98984706 128.6489735 46.88032534 127.13664313 44.546875 124.8125 C43.928125 124.19632812 43.309375 123.58015625 42.671875 122.9453125 C42.03765625 122.30335938 41.4034375 121.66140625 40.75 121 C39.77546875 120.03707031 39.77546875 120.03707031 38.78125 119.0546875 C37.86085937 118.13042969 37.86085937 118.13042969 36.921875 117.1875 C36.36081055 116.62417969 35.79974609 116.06085938 35.22167969 115.48046875 C34 114 34 114 34 112 C33.443125 111.79375 32.88625 111.5875 32.3125 111.375 C29.73916861 109.84491107 28.26949645 107.99204548 26.4375 105.65625 C24.3283276 103.22611659 21.87083291 101.29200393 19.35546875 99.296875 C18.90816406 98.86890625 18.46085938 98.4409375 18 98 C18 97.34 18 96.68 18 96 C17.34 96 16.68 96 16 96 C16 95.34 16 94.68 16 94 C15.34 94 14.68 94 14 94 C14 110.83 14 127.66 14 145 C9.05 145 4.1 145 -1 145 C-1.33 128.17 -1.66 111.34 -2 94 C-13.88 105.88 -25.76 117.76 -38 130 C-41.49353838 128.25323081 -43.13945763 127.08594785 -45.75 124.375 C-46.36359375 123.74335938 -46.9771875 123.11171875 -47.609375 122.4609375 C-48.06828125 121.97882813 -48.5271875 121.49671875 -49 121 C-41.19686673 105.39373345 -25.33783702 95.33783702 -13 83 C-54.58 82.67 -96.16 82.34 -139 82 C-139 77.05 -139 72.1 -139 67 C-97.75 66.67 -56.5 66.34 -14 66 C-15.65 64.35 -17.3 62.7 -19 61 C-19.95095606 59.98280297 -20.89420907 58.95825776 -21.82421875 57.921875 C-22.29537109 57.40109375 -22.76652344 56.8803125 -23.25195312 56.34375 C-24.22200412 55.26679543 -25.19072101 54.18863791 -26.15820312 53.109375 C-28.75886077 50.15625262 -28.75886077 50.15625262 -32 48 C-32 47.34 -32 46.68 -32 46 C-32.83144531 45.67708984 -32.83144531 45.67708984 -33.6796875 45.34765625 C-36.80423859 43.53289173 -38.75278757 41.15315214 -41.125 38.4375 C-44.16488178 34.71412066 -44.16488178 34.71412066 -48 32 C-48 31.34 -48 30.68 -48 30 C-49.485 29.505 -49.485 29.505 -51 29 C-49.52278578 25.54798361 -47.56205999 23.35038064 -44.875 20.75 C-44.15054688 20.04359375 -43.42609375 19.3371875 -42.6796875 18.609375 C-42.12539062 18.07828125 -41.57109375 17.5471875 -41 17 C-35.85170256 21.30627256 -31.04247928 25.82311931 -26.31640625 30.5859375 C-25.26585304 31.63861313 -25.26585304 31.63861313 -24.19407654 32.71255493 C-21.98116973 34.93101136 -19.77178584 37.15293815 -17.5625 39.375 C-16.05296686 40.88955466 -14.54320343 42.40387985 -13.03320312 43.91796875 C-9.35280298 47.60933099 -5.67528043 51.30354069 -2 55 C-1.98969254 54.3257045 -1.97938507 53.651409 -1.96876526 52.9566803 C-1.86094231 45.96556418 -1.74632557 38.97458333 -1.62768555 31.98364258 C-1.58425876 29.37136656 -1.54258962 26.75906072 -1.50268555 24.14672852 C-1.44516993 20.40111281 -1.38142236 16.65564831 -1.31640625 12.91015625 C-1.29969376 11.73413345 -1.28298126 10.55811066 -1.26576233 9.34645081 C-1.24581711 8.26540573 -1.22587189 7.18436066 -1.20532227 6.07055664 C-1.18977798 5.11347305 -1.1742337 4.15638947 -1.15821838 3.17030334 C-1 1 -1 1 0 0 Z " fill="#BA4E89" transform="translate(159,56)"/>
                   </svg>
                   
-                  {/* Writing utensil SVG icon */}
-                  {/* <svg className="w-4 h-4 " fill="currentColor" viewBox="0 0 24 24">
-                    <path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/>
-                  </svg>
-                   */}
+
                   {/* Mode indicator - pink A or yellow square */}
                   {styleMode === 'yellow' ? (
                     <div className="w-4 h-4 bg-yellow-400 rounded-sm"></div>
@@ -191,41 +123,24 @@ export default function Home() {
               contentEditable
               suppressContentEditableWarning={true}
             >
-              {document?.title || "No Document"}
+              {"A/B test plan"}
             </div>
             <div 
               className="text-gray-600 mb-4 p-2 focus:outline-none"
               contentEditable
               suppressContentEditableWarning={true}
             >
-              {document?.description}
+              {"No Description Provided"}
             </div>
             </div>
-          {/* Tabs for sub-pages */}
+          {/* Tabs for sub-pages
           <DocumentPageTabs
             pageNames={pageNames}
             currentPage={currentPage}
             onSelect={handlePageSelect}
           />
           {/* Editor for current page */}
-          <div className="w-full h-full min-h-[300px] flex-1">
-            {currentPage ? (
-              <TiptapEditor
-                currentFile={currentPage}
-                fileContents={pageContents}
-                onContentChange={handleContentChange}
-                onPendingEditStateChange={handlePendingEditStateChange}
-                pendingEditState={pagePendingEdits.get(currentPage) || null}
-                onApplyNewContent={handleApplyNewContentRegistration}
-                initial={pageToTiptap(getDocument(docName)?.pages[currentPage] || { title: '', segments: [] })}
-                styleMode={styleMode}
-              />
-            ) : (
-              <div className="flex items-center justify-center h-full text-gray-500">
-                <p>Select a page to start editing</p>
-              </div>
-            )}
-          </div>
+            <ProseMirrorDemo />
         </section>
       </div>
     </main>

@@ -1,6 +1,9 @@
 @import url('https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,100..1000;1,9..40,100..1000&display=swap');
 @import "tailwindcss";
 
+/* Import ProseMirror suggestion mode styles */
+@import 'prosemirror-suggestion-mode/style/suggestion-mode.css';
+
 /* Root color variables kept in sync with tailwind.config.js tokens */
 @theme {
   --page-bg: #f0f0f0;     /* pageBg - neutral gray tone from palette */
@@ -20,5 +23,359 @@
 body {
   background: var(--page-bg);
   color: var(--foreground);
+  font-family: 'DM Sans', sans-serif;
 }
+
+
+/* Override all ProseMirror Suggestion Mode styles to match our design system
+
+ We need to override them in css and can't with tailwind as these items are added dynamically 
+
+*/
+
+/* Ensure all ProseMirror elements use DM Sans */
+.ProseMirror, .ProseMirror * {
+  font-family: 'DM Sans', sans-serif !important;
+}
+
+/* ProseMirror Suggestion Mode Styles - Override Library Defaults */
+.suggestion-add {
+  color: inherit !important; /* Remove green color, keep text color */
+  text-decoration: none !important; /* Remove underline */
+  background-color: #fff59d !important; /* Yellow highlighting matching homepage */
+  padding: 0 3px;
+  border-radius: 3px;
+  font-family: 'DM Sans', sans-serif !important;
+}
+
+.suggestion-add:hover {
+  background-color: #fff176 !important; /* Slightly darker yellow on hover */
+}
+
+.suggestion-delete {
+  color: inherit !important; /* Remove red color, keep text color */
+  text-decoration: line-through !important;
+  background-color: #fff59d !important; /* Yellow highlighting matching homepage */
+  padding: 0 3px;
+  border-radius: 3px;
+  position: relative;
+  font-family: 'DM Sans', sans-serif !important;
+}
+
+.suggestion-delete:hover {
+  background-color: #fff176 !important; /* Slightly darker yellow on hover */
+}
+
+.suggestion-insert {
+  background-color: #fff59d !important; /* Yellow highlighting matching homepage */
+  padding: 0 3px;
+  border-radius: 3px;
+  font-family: 'DM Sans', sans-serif;
+}
+
+.suggestion-delete.compact {
+  display: inline-block;
+  width: 8px;
+  height: 12px;
+  background-color: #fff59d !important; /* Yellow color matching homepage */
+  border-radius: 3px;
+  margin: 0 2px;
+  vertical-align: baseline;
+  overflow: hidden;
+  text-indent: -9999px;
+  cursor: pointer;
+}
+
+.suggestion-delete.compact:hover {
+  width: auto;
+  text-indent: 0;
+  padding: 0 6px;
+  background-color: #fff176 !important; /* Slightly darker yellow on hover */
+  color: inherit !important;
+}
+
+/* Override the library's hover menu styles */
+.suggestion-hover-menu {
+  position: absolute !important;
+  background: white !important;
+  border: 1px solid #e5e7eb !important;
+  border-radius: 12px !important;
+  padding: 16px !important;
+  box-shadow: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1) !important;
+  z-index: 50 !important;
+  font-size: 14px !important;
+  max-width: 320px !important;
+  font-family: 'DM Sans', sans-serif !important;
+  line-height: 1.5 !important;
+  min-width: 200px !important;
+  white-space: normal !important;
+  color: #374151 !important;
+}
+
+.suggestion-info {
+  margin-bottom: 12px !important;
+  padding-bottom: 12px !important;
+  border-bottom: 1px solid #f3f4f6 !important;
+  font-family: 'DM Sans', sans-serif !important;
+}
+
+.suggestion-info * {
+  font-family: 'DM Sans', sans-serif !important;
+}
+
+.suggestion-buttons {
+  display: flex !important;
+  gap: 8px !important;
+  margin-top: 12px !important;
+  font-family: 'DM Sans', sans-serif !important;
+}
+
+.suggestion-buttons * {
+  font-family: 'DM Sans', sans-serif !important;
+}
+
+.suggestion-accept {
+  background-color: transparent !important;
+  color: black !important;
+  border: 1px solid #e5e7eb !important;
+  padding: 6px 12px 6px 32px !important;
+  border-radius: 6px !important;
+  font-size: 13px !important;
+  font-weight: 500 !important;
+  font-family: 'DM Sans', sans-serif !important;
+  cursor: pointer !important;
+  transition: all 0.15s ease !important;
+  position: relative !important;
+}
+
+.suggestion-accept::before {
+  content: "" !important;
+  position: absolute !important;
+  left: 8px !important;
+  top: 50% !important;
+  transform: translateY(-50%) !important;
+  width: 16px !important;
+  height: 16px !important;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke-width='2' stroke='%23000'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' d='M5 13l4 4L19 7'/%3E%3C/svg%3E") !important;
+  background-size: contain !important;
+  background-repeat: no-repeat !important;
+}
+
+.suggestion-accept:hover {
+  background-color: #f9fafb !important;
+  border-color: #d1d5db !important;
+}
+
+.suggestion-reject {
+  background-color: transparent !important;
+  color: black !important;
+  border: 1px solid #e5e7eb !important;
+  padding: 6px 12px 6px 32px !important;
+  border-radius: 6px !important;
+  font-size: 13px !important;
+  font-weight: 500 !important;
+  font-family: 'DM Sans', sans-serif !important;
+  cursor: pointer !important;
+  transition: all 0.15s ease !important;
+  position: relative !important;
+}
+
+.suggestion-reject::before {
+  content: "" !important;
+  position: absolute !important;
+  left: 8px !important;
+  top: 50% !important;
+  transform: translateY(-50%) !important;
+  width: 16px !important;
+  height: 16px !important;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke-width='2' stroke='%23000'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' d='M6 18L18 6M6 6l12 12'/%3E%3C/svg%3E") !important;
+  background-size: contain !important;
+  background-repeat: no-repeat !important;
+}
+
+.suggestion-reject:hover {
+  background-color: #f9fafb !important;
+  border-color: #d1d5db !important;
+}
+
+/* Additional button overrides for different class combinations */
+.suggestion-hover-menu .suggestion-actions button.accept,
+.suggestion-hover-menu button.suggestion-accept,
+button.suggestion-accept {
+  background: transparent !important;
+  color: black !important;
+  border: 1px solid #e5e7eb !important;
+  padding: 6px 12px 6px 32px !important;
+  position: relative !important;
+  font-family: 'DM Sans', sans-serif !important;
+}
+
+.suggestion-hover-menu .suggestion-actions button.accept::before,
+.suggestion-hover-menu button.suggestion-accept::before,
+button.suggestion-accept::before {
+  content: "" !important;
+  position: absolute !important;
+  left: 8px !important;
+  top: 50% !important;
+  transform: translateY(-50%) !important;
+  width: 16px !important;
+  height: 16px !important;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke-width='2' stroke='%23000'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' d='M5 13l4 4L19 7'/%3E%3C/svg%3E") !important;
+  background-size: contain !important;
+  background-repeat: no-repeat !important;
+}
+
+.suggestion-hover-menu .suggestion-actions button.accept:hover,
+.suggestion-hover-menu button.suggestion-accept:hover,
+button.suggestion-accept:hover {
+  background: #f9fafb !important;
+  border-color: #d1d5db !important;
+}
+
+.suggestion-hover-menu .suggestion-actions button.reject,
+.suggestion-hover-menu button.suggestion-reject,
+button.suggestion-reject {
+  background: transparent !important;
+  color: black !important;
+  border: 1px solid #e5e7eb !important;
+  padding: 6px 12px 6px 32px !important;
+  position: relative !important;
+  font-family: 'DM Sans', sans-serif !important;
+}
+
+.suggestion-hover-menu .suggestion-actions button.reject::before,
+.suggestion-hover-menu button.suggestion-reject::before,
+button.suggestion-reject::before {
+  content: "" !important;
+  position: absolute !important;
+  left: 8px !important;
+  top: 50% !important;
+  transform: translateY(-50%) !important;
+  width: 16px !important;
+  height: 16px !important;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke-width='2' stroke='%23000'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' d='M6 18L18 6M6 6l12 12'/%3E%3C/svg%3E") !important;
+  background-size: contain !important;
+  background-repeat: no-repeat !important;
+}
+
+.suggestion-hover-menu .suggestion-actions button.reject:hover,
+.suggestion-hover-menu button.suggestion-reject:hover,
+button.suggestion-reject:hover {
+  background: #f9fafb !important;
+  border-color: #d1d5db !important;
+}
+
+/* Style Mode Variants - Yellow Highlighting vs Pink Text */
+
+/* Yellow highlighting mode (default) */
+.suggestion-mode-yellow .suggestion-add {
+  color: inherit !important;
+  text-decoration: none !important;
+  background-color: #fff59d !important; /* Yellow highlighting */
+  padding: 0 3px;
+  border-radius: 3px;
+  font-family: 'DM Sans', sans-serif !important;
+}
+
+.suggestion-mode-yellow .suggestion-add:hover {
+  background-color: #fff176 !important; /* Slightly darker yellow on hover */
+}
+
+.suggestion-mode-yellow .suggestion-delete {
+  color: inherit !important;
+  text-decoration: line-through !important;
+  background-color: #fff59d !important; /* Yellow highlighting */
+  padding: 0 3px;
+  border-radius: 3px;
+  position: relative;
+  font-family: 'DM Sans', sans-serif !important;
+}
+
+.suggestion-mode-yellow .suggestion-delete:hover {
+  background-color: #fff176 !important; /* Slightly darker yellow on hover */
+}
+
+.suggestion-mode-yellow .suggestion-insert {
+  background-color: #fff59d !important; /* Yellow highlighting */
+  padding: 0 3px;
+  border-radius: 3px;
+  font-family: 'DM Sans', sans-serif;
+}
+
+.suggestion-mode-yellow .suggestion-delete.compact {
+  background-color: #fff59d !important; /* Yellow color */
+}
+
+.suggestion-mode-yellow .suggestion-delete.compact:hover {
+  background-color: #fff176 !important; /* Slightly darker yellow on hover */
+}
+
+/* Pink text mode */
+.suggestion-mode-pink .suggestion-add {
+  color: #b43f7f !important; /* Pink text matching TrackedQuill */
+  text-decoration: none !important;
+  background-color: transparent !important;
+  padding: 0 3px;
+  border-radius: 3px;
+  font-family: 'DM Sans', sans-serif !important;
+}
+
+.suggestion-mode-pink .suggestion-add:hover {
+  color: #9a356a !important; /* Slightly darker pink on hover */
+  background-color: rgba(180, 63, 127, 0.05) !important; /* Subtle pink background on hover */
+}
+
+.suggestion-mode-pink .suggestion-delete {
+  color: #b43f7f !important; /* Pink text matching TrackedQuill */
+  text-decoration: line-through !important;
+  background-color: transparent !important;
+  padding: 0 3px;
+  border-radius: 3px;
+  position: relative;
+  font-family: 'DM Sans', sans-serif !important;
+}
+
+.suggestion-mode-pink .suggestion-delete:hover {
+  color: #9a356a !important; /* Slightly darker pink on hover */
+  background-color: rgba(180, 63, 127, 0.05) !important; /* Subtle pink background on hover */
+}
+
+.suggestion-mode-pink .suggestion-insert {
+  color: #b43f7f !important; /* Pink text matching TrackedQuill */
+  background-color: transparent !important;
+  padding: 0 3px;
+  border-radius: 3px;
+  font-family: 'DM Sans', sans-serif;
+}
+
+.suggestion-mode-pink .suggestion-delete.compact {
+  background-color: #b43f7f !important; /* Pink color matching TrackedQuill */
+}
+
+.suggestion-mode-pink .suggestion-delete.compact:hover {
+  background-color: #9a356a !important; /* Slightly darker pink on hover */
+}
+
+/* Button styles for different modes */
+
+/* Yellow mode buttons (default styling already applied above) */
+.suggestion-mode-yellow .suggestion-accept,
+.suggestion-mode-yellow .suggestion-hover-menu .suggestion-actions button.accept,
+.suggestion-mode-yellow .suggestion-hover-menu button.suggestion-accept,
+.suggestion-mode-yellow button.suggestion-accept {
+  background-color: transparent !important;
+  color: black !important;
+  border: 1px solid #e5e7eb !important;
+}
+
+.suggestion-mode-yellow .suggestion-reject,
+.suggestion-mode-yellow .suggestion-hover-menu .suggestion-actions button.reject,
+.suggestion-mode-yellow .suggestion-hover-menu button.suggestion-reject,
+.suggestion-mode-yellow button.suggestion-reject {
+  background-color: transparent !important;
+  color: black !important;
+  border: 1px solid #e5e7eb !important;
+}
+
+
 

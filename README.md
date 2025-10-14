@@ -53,12 +53,20 @@ deletions- strikethrough and highlighted in yellow
   - [x] make it clean
 - [x] Remove quill component box styling
 - [x] Make file title and description editable
-- [ ] Atomic diff/save functionality +ui
-- [ ] Simplify/clean up js logic
-- [ ] New sections button, plus old sections editable
-- [ ] Mobile view
-- [ ] Try out different string matchers
+
+  
+After prose mirror:
+- [x] LLM inline comment capabilities
+- [x] Atomic diff/save functionality +ui
+- [ ] LLM form
+- [ ] Structured minisections per page / uneditable titles (takes thinking)
+- [ ] React form validation
+
+
+
+
+- [ ] Text size option support
+- [ ] Support for ctr-b/i shortcuts
 - [ ] Version history far down the road, but possible since I'm tracking and updating all edits
-- [ ] Figure out logic on where to put start of llm text if theyre very different
-- [ ] LLM inline comment capabilities
+
 
