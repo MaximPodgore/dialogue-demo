@@ -18,8 +18,9 @@ Uses ProseMirror plus [suggestion-mode package](https://github.com/davefowler/pr
 - [x] Remove quill component box styling
 - [x] Make file title and description editable
 
-  
-After prose mirror:
+        
+**After switching from quill to Prosemirror:**  
+
 - [x] LLM inline comment capabilities
 - [x] Atomic diff/save functionality +ui
 - [x] LLM form
