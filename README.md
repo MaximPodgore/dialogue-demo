@@ -2,16 +2,6 @@
 
 Uses ProseMirror plus [suggestion-mode package](https://github.com/davefowler/prosemirror-suggestion-mode) for easy diff tracking, visualization, and ui/ux interaction.
 
-
-
-## Constant functionality:
-
-Might stick with diff-match-patch for both RTE options, surprisingly easy and doesnt require built in versioning/edit tracking of RTE
-
-applyDiff used on llm calls  
-additions - highlighted in yellow  
-deletions- strikethrough and highlighted in yellow  
-
 ## Todo
 
 - [x] Llm diff functionality 
@@ -32,15 +22,14 @@ deletions- strikethrough and highlighted in yellow
 After prose mirror:
 - [x] LLM inline comment capabilities
 - [x] Atomic diff/save functionality +ui
-- [ ] LLM form
-- [ ] Structured minisections per page / uneditable titles (takes thinking)
+- [x] LLM form
+- [x] uneditable titles (bolded text)
 - [ ] React form validation
-
+- [ ] suggestion pop stays on click (actually really hard)
 
 
 
 - [ ] Text size option support
-- [ ] Support for ctr-b/i shortcuts
 - [ ] Version history far down the road, but possible since I'm tracking and updating all edits
 
 

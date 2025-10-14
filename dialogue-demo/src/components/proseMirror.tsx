@@ -14,12 +14,14 @@ interface SuggestionEditorProps {
   initialContent?: string;
   initialSuggestions?: TextSuggestion[];
   onContentChange?: (content: string) => void;
+  className?: string;
 }
 
 const SuggestionEditor = ({ 
   initialContent, 
   initialSuggestions = [], 
-  onContentChange 
+  onContentChange,
+  className = '',
 }: SuggestionEditorProps) => {
   const editorContainerRef = useRef<HTMLDivElement>(null);
   const viewRef = useRef<any>(null);
@@ -56,22 +58,41 @@ const SuggestionEditor = ({
           import('prosemirror-suggestion-mode'),
         ]);
         await import('prosemirror-suggestion-mode/style/suggestion-mode.css');
+        // Import strong mark spec from prosemirror-schema-basic
+        const { strong } = (await import('prosemirror-schema-basic')).marks;
+        // Custom strong mark spec: uneditable
+        const strongUneditableSpec = {
+          ...strong,
+          attrs: { ...strong.attrs, uneditable: { default: true } },
+          toDOM: (node: any) => [
+            'strong',
+            { contenteditable: 'false', 'data-uneditable': 'true' },
+            0 as any,
+          ] as [string, Record<string, any>, number],
+        };
+        // Add suggestion marks except for strong
+        const suggestionMarks = addSuggestionMarks(schema.spec.marks);
+        const marks = {
+          ...suggestionMarks,
+          strong: strongUneditableSpec,
+        };
         const exampleSchema = new Schema({
           nodes: addListNodes(schema.spec.nodes, 'paragraph block*', 'block'),
-          marks: addSuggestionMarks(schema.spec.marks),
+          marks,
         });
         const createSuggestionReasonComponent = (attrs: Record<string, any>) => {
           const reasonDiv = document.createElement('div');
           reasonDiv.className = 'suggestion-info';
           const reason = attrs?.data?.reason;
           if (reason) {
-            const reasonLabel = document.createElement('strong');
+            const reasonLabel = document.createElement('span');
             reasonLabel.textContent = `${attrs.username}: `;
-            reasonLabel.style.fontWeight = '600';
+            reasonLabel.style.fontWeight = '600'; // Bold
             reasonLabel.style.color = '#111827';
             reasonLabel.style.fontFamily = "'DM Sans', sans-serif";
             const reasonText = document.createElement('span');
             reasonText.textContent = reason;
+            reasonText.style.fontWeight = '400'; // Not bold
             reasonText.style.color = '#374151';
             reasonText.style.fontFamily = "'DM Sans', sans-serif";
             reasonDiv.appendChild(reasonLabel);
@@ -84,20 +105,55 @@ const SuggestionEditor = ({
         const parser = DOMParser.fromSchema(exampleSchema);
         const htmlDoc = new window.DOMParser().parseFromString(content, 'text/html');
         const doc = parser.parse(htmlDoc.body);
+        // Custom plugin to prevent editing inside bold
+        const uneditablePlugin = new (await import('prosemirror-state')).Plugin({
+          props: {
+            handleDOMEvents: {
+              beforeinput(view, event) {
+                const sel = view.state.selection;
+                if (sel.empty) {
+                  const marks = view.state.storedMarks || sel.$from.marks();
+                  if (marks.some(m => m.type.name === 'strong')) {
+                    event.preventDefault();
+                    return true;
+                  }
+                } else {
+                  // If selection contains bold, block edit
+                  let blocked = false;
+                  view.state.doc.nodesBetween(sel.from, sel.to, (node, pos, parent, index) => {
+                    if (node.marks && node.marks.some(m => m.type.name === 'strong')) blocked = true;
+                  });
+                  if (blocked) {
+                    event.preventDefault();
+                    return true;
+                  }
+                }
+                return false;
+              },
+            },
+            decorations(state) {
+              // Optionally add a visual cue for uneditable bold
+              return null;
+            },
+          },
+        });
+        // Suggestion plugin (no shouldApplySuggestion option)
+        const suggestionPlugin = suggestionModePlugin({
+          username: 'example user',
+          inSuggestionMode: false,
+          hoverMenuOptions: {
+            components: {
+              createInfoComponent: createSuggestionReasonComponent,
+            },
+          },
+        });
         const state = EditorState.create({
           schema: exampleSchema,
           doc,
           plugins: [
             keymap(baseKeymap),
-            suggestionModePlugin({
-              username: 'example user',
-              inSuggestionMode: false,
-              hoverMenuOptions: {
-                components: {
-                  createInfoComponent: createSuggestionReasonComponent,
-                },
-              },
-            }),
+            uneditablePlugin,
+            suggestionPlugin,
           ],
         });
         const view = new EditorView(editorContainerRef.current!, {
@@ -141,10 +197,22 @@ const SuggestionEditor = ({
         (window as any).rejectAllSuggestions = () => {
           rejectAllSuggestions(view.state, view.dispatch);
         };
-        // Apply suggestions if provided
+        // Apply suggestions if provided, but skip bold
         if (initialSuggestions && initialSuggestions.length > 0) {
           initialSuggestions.forEach((suggestion) => {
-            applySuggestion(view, suggestion, 'some suggester');
+            // Only apply if not inside bold
+            const { textToReplace } = suggestion;
+            const docText = view.state.doc.textBetween(0, view.state.doc.content.size, '\n');
+            const start = docText.indexOf(textToReplace);
+            if (start !== -1) {
+              let isBold = false;
+              view.state.doc.nodesBetween(start, start + textToReplace.length, (node: any) => {
+                if (node.marks && node.marks.some((m: any) => m.type.name === 'strong')) isBold = true;
+              });
+              if (!isBold) {
+                applySuggestion(view, suggestion, 'George, Dialogue AI');
+              }
+            }
           });
         }
       };
@@ -178,11 +246,11 @@ const SuggestionEditor = ({
 
 
   return (
-    <div className="w-full max-w-4xl mx-auto p-6" style={{ fontFamily: "'DM Sans', sans-serif" }}>
+    <div className="w-full max-w-4xl mx-auto" style={{ fontFamily: "'DM Sans', sans-serif" }}>
       <div
         ref={editorContainerRef}
-        className="suggestion-mode-pink border border-gray-300 rounded-lg p-4 min-h-[300px] prose max-w-none"
-        style={{ fontFamily: "'DM Sans', sans-serif", lineHeight: '1.6' }}
+        className={`${className} min-h-[300px] prose max-w-none`}
+        style={{ fontFamily: "'DM Sans', sans-serif", lineHeight: '1.6', border: 'none', outline: 'none', boxShadow: 'none', padding: 0 }}
       />
       {/* Accept/Reject buttons - always show if initialSuggestions exist */}
       {initialSuggestions && initialSuggestions.length > 0 && (

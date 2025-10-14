@@ -33,6 +33,11 @@ body {
 
 */
 
+/* Remove focus outline from ProseMirror elements */
+.ProseMirror:focus {
+  outline: none !important;
+}
+
 /* Ensure all ProseMirror elements use DM Sans */
 .ProseMirror, .ProseMirror * {
   font-family: 'DM Sans', sans-serif !important;

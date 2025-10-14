@@ -66,6 +66,18 @@ export default function Home() {
               </div>
               <div className="flex flex-col items-end gap-2">
                 <button type="submit" className="p-3 bg-black hover:bg-gray-800 text-white rounded-md font-small">Add Suggestion</button>
+                
+              </div>
+            </form>
+          </div>
+
+          {/* Form with white background */}
+          <div className="bg-card rounded-lg p-6 shadow-sm">
+            <form className="space-y-4">
+              <div>
+                <input className="w-full border-border rounded px-3 py-2 focus:outline-none focus:border-transparent" name="single" placeholder="Ask George (get a mock response)" type="text" />
+              </div>
+              <div className="flex justify-end">
                 <button
                   type="button"
                   className="p-3 bg-black hover:bg-gray-800 text-white rounded-md font-small"
@@ -110,24 +122,13 @@ export default function Home() {
                     setSuggestions([...suggestions, ...defaultSuggestions]);
                   }}
                 >
-                  Add default suggestions to the prose component
+                  Add default/non-form suggestions to the prose component
                 </button>
-              </div>
-            </form>
-          </div>
-
-          {/* Form with white background */}
-          <div className="bg-card rounded-lg p-6 shadow-sm">
-            <form className="space-y-4">
-              <div>
-                <input className="w-full border-border rounded px-3 py-2 focus:outline-none focus:border-transparent" name="single" placeholder="Ask George (get a mock response)" type="text" />
-              </div>
-              <div className="flex justify-end">
-                <button type="submit" className="p-3 bg-gray-900 hover:bg-gray-800 text-white rounded-md font-small">
+                {/* <button type="submit" className="p-3 bg-gray-900 hover:bg-gray-800 text-white rounded-md font-small">
                   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />
                   </svg>
-                </button>
+                </button> */}
               </div>
             </form>
           </div>
@@ -203,31 +204,29 @@ export default function Home() {
             </div>
           </div>
           
-          {/* Main document heading and description */}
-            <div className="mb-2 pt-16">
+          {/* Main document heading, description, and prose editor aligned with reduced left padding */}
+          <div className="flex flex-col items-start w-full max-w-2xl mx-auto pt-16 pl-1.5" >
             <div 
-              className="text-2xl font-bold mb-2 p-2 focus:outline-none"
+              className="text-2xl font-bold mb-2 focus:outline-none"
               contentEditable
               suppressContentEditableWarning={true}
+              style={{paddingLeft: 0}}
             >
-              {"A/B test plan"}
+              {"Landing Page A/B Test"}
             </div>
             <div 
-              className="text-gray-600 mb-4 p-2 focus:outline-none"
+              className="text-gray-600 mb-4 focus:outline-none"
               contentEditable
               suppressContentEditableWarning={true}
+              style={{paddingLeft: 0}}
             >
-              {"No Description Provided"}
+              {"This is a short description of what the study is about. It should sound really good and concise."}
             </div>
+            {/* Editor for current page */}
+            <div className="w-full focus-outline-none" >
+              <ProseMirrorDemo initialSuggestions={suggestions} styleMode={styleMode} />
             </div>
-          {/* Tabs for sub-pages
-          <DocumentPageTabs
-            pageNames={pageNames}
-            currentPage={currentPage}
-            onSelect={handlePageSelect}
-          />
-          {/* Editor for current page */}
-            <ProseMirrorDemo initialSuggestions={suggestions} />
+          </div>
         </section>
       </div>
     </main>
