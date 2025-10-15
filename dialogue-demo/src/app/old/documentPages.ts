@@ -1,4 +1,4 @@
-import documentPagesData from '../data/document-pages.json';
+import documentPagesData from '../../data/document-pages.json';
 
 export interface ContentSegment {
   text: string;

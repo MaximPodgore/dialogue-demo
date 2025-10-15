@@ -50,7 +50,6 @@ body {
   background-color: #fff59d !important; /* Yellow highlighting matching homepage */
   padding: 0 3px;
   border-radius: 3px;
-  font-family: 'DM Sans', sans-serif !important;
 }
 
 .suggestion-add:hover {
@@ -64,7 +63,6 @@ body {
   padding: 0 3px;
   border-radius: 3px;
   position: relative;
-  font-family: 'DM Sans', sans-serif !important;
 }
 
 .suggestion-delete:hover {
@@ -75,7 +73,6 @@ body {
   background-color: #fff59d !important; /* Yellow highlighting matching homepage */
   padding: 0 3px;
   border-radius: 3px;
-  font-family: 'DM Sans', sans-serif;
 }
 
 .suggestion-delete.compact {
@@ -110,34 +107,21 @@ body {
   z-index: 50 !important;
   font-size: 14px !important;
   max-width: 320px !important;
-  font-family: 'DM Sans', sans-serif !important;
   line-height: 1.5 !important;
   min-width: 200px !important;
   white-space: normal !important;
   color: #374151 !important;
-}
-
-.suggestion-info {
-  margin-bottom: 12px !important;
   padding-bottom: 12px !important;
   border-bottom: 1px solid #f3f4f6 !important;
-  font-family: 'DM Sans', sans-serif !important;
 }
 
-.suggestion-info * {
-  font-family: 'DM Sans', sans-serif !important;
-}
 
 .suggestion-buttons {
   display: flex !important;
   gap: 8px !important;
   margin-top: 12px !important;
-  font-family: 'DM Sans', sans-serif !important;
 }
 
-.suggestion-buttons * {
-  font-family: 'DM Sans', sans-serif !important;
-}
 
 .suggestion-accept {
   background-color: transparent !important;
@@ -147,7 +131,6 @@ body {
   border-radius: 6px !important;
   font-size: 13px !important;
   font-weight: 500 !important;
-  font-family: 'DM Sans', sans-serif !important;
   cursor: pointer !important;
   transition: all 0.15s ease !important;
   position: relative !important;
@@ -179,7 +162,6 @@ body {
   border-radius: 6px !important;
   font-size: 13px !important;
   font-weight: 500 !important;
-  font-family: 'DM Sans', sans-serif !important;
   cursor: pointer !important;
   transition: all 0.15s ease !important;
   position: relative !important;
@@ -212,7 +194,6 @@ button.suggestion-accept {
   border: 1px solid #e5e7eb !important;
   padding: 6px 12px 6px 32px !important;
   position: relative !important;
-  font-family: 'DM Sans', sans-serif !important;
 }
 
 .suggestion-hover-menu .suggestion-actions button.accept::before,
@@ -245,7 +226,6 @@ button.suggestion-reject {
   border: 1px solid #e5e7eb !important;
   padding: 6px 12px 6px 32px !important;
   position: relative !important;
-  font-family: 'DM Sans', sans-serif !important;
 }
 
 .suggestion-hover-menu .suggestion-actions button.reject::before,
@@ -279,7 +259,6 @@ button.suggestion-reject:hover {
   background-color: #fff59d !important; /* Yellow highlighting */
   padding: 0 3px;
   border-radius: 3px;
-  font-family: 'DM Sans', sans-serif !important;
 }
 
 .suggestion-mode-yellow .suggestion-add:hover {
@@ -293,7 +272,6 @@ button.suggestion-reject:hover {
   padding: 0 3px;
   border-radius: 3px;
   position: relative;
-  font-family: 'DM Sans', sans-serif !important;
 }
 
 .suggestion-mode-yellow .suggestion-delete:hover {
@@ -304,7 +282,6 @@ button.suggestion-reject:hover {
   background-color: #fff59d !important; /* Yellow highlighting */
   padding: 0 3px;
   border-radius: 3px;
-  font-family: 'DM Sans', sans-serif;
 }
 
 .suggestion-mode-yellow .suggestion-delete.compact {
@@ -322,7 +299,6 @@ button.suggestion-reject:hover {
   background-color: transparent !important;
   padding: 0 3px;
   border-radius: 3px;
-  font-family: 'DM Sans', sans-serif !important;
 }
 
 .suggestion-mode-pink .suggestion-add:hover {
@@ -337,7 +313,6 @@ button.suggestion-reject:hover {
   padding: 0 3px;
   border-radius: 3px;
   position: relative;
-  font-family: 'DM Sans', sans-serif !important;
 }
 
 .suggestion-mode-pink .suggestion-delete:hover {
@@ -350,7 +325,6 @@ button.suggestion-reject:hover {
   background-color: transparent !important;
   padding: 0 3px;
   border-radius: 3px;
-  font-family: 'DM Sans', sans-serif;
 }
 
 .suggestion-mode-pink .suggestion-delete.compact {

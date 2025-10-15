@@ -68,6 +68,7 @@ export default function Home() {
   };
 
   // Always update sectionOptions and currentValue when editorContent changes
+  // This is how we keep the form in sync with latest editor content
   React.useEffect(() => {
     if (!editorContent || editorContent.trim().length === 0) return;
     //console.log('Sections effect triggered with editorContent:');
@@ -111,8 +112,8 @@ export default function Home() {
 
   const handleSuggestionSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    // Use formToSuggestion to create suggestion from form data and section info
-    const suggestion = formToSuggestion(sectionOptions, field, currentValue, newValue);
+    // Use formToSuggestion to create suggestion from form data and section info, username set to "User"
+    const suggestion = formToSuggestion(sectionOptions, field, currentValue, newValue, "User");
     setNewSuggestions(prev => [...prev, suggestion]);
     // Do not clear the form fields after submission
   };

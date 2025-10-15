@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useEffect, useRef, useState } from 'react';
+import { processSuggestionRejection } from "../utils/suggestionRejection";
 
 export interface TextSuggestion {
   textToReplace: string;
@@ -8,6 +9,7 @@ export interface TextSuggestion {
   reason: string;
   textBefore: string;
   textAfter: string;
+  username: string;
 }
 
 interface SuggestionEditorProps {
@@ -191,24 +193,6 @@ const SuggestionEditor = ({
         const html = tempDiv.innerHTML;
         onContentChange(html);
       }
-      (window as any).toggleBold = () => {
-        const command = toggleMark(exampleSchema.marks.strong);
-        command(view.state, view.dispatch, view);
-      };
-      (window as any).toggleItalic = () => {
-        const command = toggleMark(exampleSchema.marks.em);
-        command(view.state, view.dispatch, view);
-      };
-      (window as any).isBoldActive = () => {
-        const { $from, to, empty } = view.state.selection;
-        if (empty) return exampleSchema.marks.strong.isInSet(view.state.storedMarks || $from.marks());
-        return view.state.doc.rangeHasMark(view.state.selection.from, to, exampleSchema.marks.strong);
-      };
-      (window as any).isItalicActive = () => {
-        const { $from, to, empty } = view.state.selection;
-        if (empty) return exampleSchema.marks.em.isInSet(view.state.storedMarks || $from.marks());
-        return view.state.doc.rangeHasMark(view.state.selection.from, to, exampleSchema.marks.em);
-      };
       (window as any).acceptAllSuggestions = () => {
         acceptAllSuggestions(view.state, view.dispatch);
       };
@@ -230,88 +214,14 @@ const SuggestionEditor = ({
   }, []);
 
   // Apply all new suggestions each time newSuggestions changes
+  // Move suggestion rejection logic to a utility function for readability
   useEffect(() => {
-    if (!viewRef.current || !modulesRef.current || !schemaRef.current || !newSuggestions || newSuggestions.length === 0) return;
-    const { applySuggestion } = modulesRef.current;
-    const view = viewRef.current;
-    newSuggestions.forEach((suggestion) => {
-      const { textToReplace, textBefore, textAfter } = suggestion;
-      let docText = '';
-      type PosMapEntry = { pos: number; node: any };
-      let posMap: PosMapEntry[] = [];
-      view.state.doc.descendants((node: any, pos: number) => {
-        if (node.isText && typeof node.text === 'string') {
-          docText += node.text;
-          for (let i = 0; i < node.text.length; i++) {
-            posMap.push({ pos: pos + i, node });
-          }
-        } else if (node.isLeaf && typeof node.textContent === 'string') {
-          docText += node.textContent;
-          for (let i = 0; i < node.textContent.length; i++) {
-            posMap.push({ pos: pos + i, node });
-          }
-        }
-      });
-      let matchIndices: number[] = [];
-      let idx = docText.indexOf(textToReplace);
-      while (idx !== -1) {
-        matchIndices.push(idx);
-        idx = docText.indexOf(textToReplace, idx + 1);
-      }
-      if (matchIndices.length === 0) {
-        applySuggestion(view, suggestion, 'George, Dialogue AI');
-        return;
-      }
-      if (matchIndices.length === 1) {
-        const replaceIdx = matchIndices[0];
-        let isBoldInReplace = false;
-        for (let i = replaceIdx; i < replaceIdx + textToReplace.length; i++) {
-          const { node } = posMap[i] as PosMapEntry;
-          if (node.marks && node.marks.some((m: any) => m.type.name === 'strong')) {
-            isBoldInReplace = true;
-              console.log('Bold detected in replacement text for suggestion:', suggestion);
-            break;
-          }
-        }
-        if (!isBoldInReplace) {
-          applySuggestion(view, suggestion, 'George, Dialogue AI');
-        }
-        return;
-      }
-      for (const replaceIdx of matchIndices) {
-        let beforeOk = true;
-        let afterOk = true;
-        if (textBefore) {
-          beforeOk = false;
-          const beforeIdx = docText.lastIndexOf(textBefore, replaceIdx);
-          if (beforeIdx !== -1 && beforeIdx + textBefore.length === replaceIdx) {
-            beforeOk = true;
-          }
-        }
-        if (textAfter) {
-          afterOk = false;
-          const afterIdx = docText.indexOf(textAfter, replaceIdx + textToReplace.length);
-          if (afterIdx !== -1 && replaceIdx + textToReplace.length === afterIdx) {
-            afterOk = true;
-          }
-        }
-        if (beforeOk && afterOk) {
-          let isBoldInReplace = false;
-          for (let i = replaceIdx; i < replaceIdx + textToReplace.length; i++) {
-            const { node } = posMap[i] as PosMapEntry;
-            if (node.marks && node.marks.some((m: any) => m.type.name === 'strong')) {
-              isBoldInReplace = true;
-                console.log('Bold detected in replacement text for suggestion:', suggestion);
-              break;
-            }
-          }
-          if (!isBoldInReplace) {
-            applySuggestion(view, suggestion, 'George, Dialogue AI');
-            break;
-          }
-        }
-      }
-    });
+    processSuggestionRejection(
+      viewRef.current,
+      modulesRef.current,
+      schemaRef.current,
+      newSuggestions
+    );
   }, [newSuggestions]);
 
   return (

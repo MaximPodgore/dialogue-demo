@@ -6,13 +6,15 @@ import { TextSuggestion } from "@/components/proseMirror";
  * @param fieldName The selected field name (section title)
  * @param currentValue The current value of the field
  * @param newValue The new value for the field
+ * @param username The username for the suggestion
  * @returns TextSuggestion object
  */
 export function formToSuggestion(
   sections: { title: string; text: string }[],
   fieldName: string,
   currentValue: string,
-  newValue: string
+  newValue: string,
+  username: string
 ): TextSuggestion {
   // Find the index of the section with the matching title
   const sectionIndex = sections.findIndex(s => s.title === fieldName);
@@ -29,8 +31,9 @@ export function formToSuggestion(
   return {
     textToReplace: currentValue,
     textReplacement: newValue,
-    reason: "User suggestion:",
+    reason: "User wanted it this way",
     textBefore,
     textAfter: textAfter || "",
+    username,
   };
 }
