@@ -2,14 +2,17 @@
 
 import React, { useState } from "react";
 
-import ProseMirrorDemo from "@/components/ProseMirrorDemo";
+import SuggestionEditor from "@/components/proseMirror";
 import { TextSuggestion } from "@/components/proseMirror";
 import { getBoldSectionsText } from "@/utils/sectionUtils";
+import { formToSuggestion } from "@/utils/formToSuggestion";
+import { validateSectionsFromHtml } from "../utils/validateSections";
 
 export default function Home() {
   const [styleMode, setStyleMode] = useState<'yellow' | 'pink'>('yellow');
   const [isStyleDropdownOpen, setIsStyleDropdownOpen] = useState(false);
-  const [suggestions, setSuggestions] = useState<TextSuggestion[]>([]);
+  // Track all new suggestions to apply
+  const [newSuggestions, setNewSuggestions] = useState<TextSuggestion[]>([]);
   // Selected field (section title)
   const [field, setField] = useState('');
   // Current value (readonly)
@@ -18,13 +21,15 @@ export default function Home() {
   const [newValue, setNewValue] = useState('');
   // Store editor content for section extraction
   const [editorContent, setEditorContent] = useState<string>('');
+  // Validation state
+  const [validationResult, setValidationResult] = useState<{ valid: boolean; errors: string[] } | null>(null);
   // Section titles and text
   const [sectionOptions, setSectionOptions] = useState<{ title: string; text: string }[]>([]);
 
-  // Initial content from ProseMirrorDemo
+  // Initial content from ProseMirrorDemo 
   const initialContent = `
     <b>Background</b>
-    <p>This is a background that George generated for the study. This should give someone a good idea of the reasons behind this study.<br>
+    <p>This is a background that George generated for the study. This should give someone a good idea of the reasons behind this study.
     Hypothetically should this text be editable at all ?</p>
     <br />
     <b>Objectives</b>
@@ -53,8 +58,20 @@ export default function Home() {
   // Handler for content change from ProseMirrorDemo
   const handleEditorContentChange = (content: string) => {
     setEditorContent(content);
-    // Update section options whenever editor content changes
-    const sections = getBoldSectionsText(content);
+    //console.log('Editor content updated in page.tsx:');
+  };
+
+  // Validate button handler
+  const handleValidateSections = () => {
+    const result = validateSectionsFromHtml(editorContent);
+    setValidationResult(result);
+  };
+
+  // Always update sectionOptions and currentValue when editorContent changes
+  React.useEffect(() => {
+    if (!editorContent || editorContent.trim().length === 0) return;
+    //console.log('Sections effect triggered with editorContent:');
+    const sections = getBoldSectionsText(editorContent);
     setSectionOptions(sections);
     // If field is set, update currentValue and newValue to match new section text
     if (sections.length > 0) {
@@ -63,43 +80,43 @@ export default function Home() {
       setCurrentValue(selected.text);
       setNewValue(selected.text);
     }
-  };
+  }, [editorContent]);
 
   // When field changes, update newValue to current section text
   const handleFieldChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     const selectedTitle = e.target.value;
     setField(selectedTitle);
-    // Find section text
-    const section = sectionOptions.find(s => s.title === selectedTitle);
+    // Always extract latest section text from editorContent
+    if (!editorContent || editorContent.trim().length === 0) return;
+    const sections = getBoldSectionsText(editorContent);
+    const section = sections.find(s => s.title === selectedTitle);
     const text = section ? section.text : '';
     setCurrentValue(text);
     setNewValue(text);
   };
 
+  // When dropdown is opened, refresh sectionOptions from latest editorContent (fallback to initialContent)
+  const handleFieldDropdownOpen = () => {
+    if (!editorContent || editorContent.trim().length === 0) return;
+    const sections = getBoldSectionsText(editorContent);
+    setSectionOptions(sections);
+    // If current field is not in new sections, reset to first
+    if (sections.length > 0) {
+      const selected = sections.find(s => s.title === field) || sections[0];
+      setField(selected.title);
+      setCurrentValue(selected.text);
+      setNewValue(selected.text);
+    }
+  };
+
   const handleSuggestionSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    setSuggestions([
-      ...suggestions,
-      {
-        textToReplace: field,
-        textReplacement: newValue,
-        reason: 'Not George:',
-        textBefore: '',
-        textAfter: '',
-      },
-    ]);
+    // Use formToSuggestion to create suggestion from form data and section info
+    const suggestion = formToSuggestion(sectionOptions, field, currentValue, newValue);
+    setNewSuggestions(prev => [...prev, suggestion]);
     // Do not clear the form fields after submission
   };
-  // Will use later for llm stuff
-  //   const getMockLLMResponse = () => {
-  //     return mockResponse.response;
-  //   };
-  
-  //   const handleFormSubmit = (e: React.FormEvent) => {
-  //     e.preventDefault();
-  //     const llmText = getMockLLMResponse();
-  //     setPendingLLMContent(llmText);
-  //   };
+
 
   return (
     <main className="bg-pageBg h-screen overflow-hidden">
@@ -110,13 +127,13 @@ export default function Home() {
           <div className="bg-card rounded-lg shadow-sm p-8 mb-6 flex-1 flex flex-col items-center justify-center min-h-[200px]">
             <form className="w-full max-w-lg space-y-4" onSubmit={handleSuggestionSubmit}>
               <h2 className="text-lg font-bold mb-2">Add a Suggestion </h2>
-              <p>(backend logic not done)</p>
               <div>
                 <label className="block text-sm font-medium mb-1">Field</label>
                 <select
                   name="field"
                   value={field}
                   onChange={handleFieldChange}
+                  onClick={handleFieldDropdownOpen}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-white text-left hover:bg-gray-50 transition-colors focus:outline-none font-medium text-sm "
                   required
                 >
@@ -183,45 +200,19 @@ export default function Home() {
                 <button
                   type="button"
                   className="p-3 bg-black hover:bg-gray-800 text-white rounded-md font-small"
-                  onClick={() => {
-                    const defaultSuggestions = [
-                      {
-                        textToReplace: 'This is a background that George generated for the study. This should give someone a good idea of the reasons behind this study. Hypothetically should this text be editable at all ?',
-                        textReplacement: 'This background provides context and rationale for the study, helping readers understand its purpose.',
-                        reason: 'George: Clarified the background for better readability and professionalism.',
-                        textBefore: 'Background',
-                        textAfter: 'Objectives'
-                      },
-                      {
-                        textToReplace: 'This are objectives that George generated for the study. This should give someone a good idea of the goals behind this study. Hypothetically should this text be editable at all ? Hmmm.',
-                        textReplacement: 'These objectives outline the specific goals of the study, providing clear direction for the research.',
-                        reason: 'George: Improved grammar and clarified the objectives section.',
-                        textBefore: 'Objectives',
-                        textAfter: 'This is text for the first objective'
-                      },
-                      {
-                        textToReplace: 'This is text for the first objective',
-                        textReplacement: 'Objective 1: Increase user engagement by 20% over 3 months.',
-                        reason: 'George: Made the objective more specific and measurable.',
-                        textBefore: 'Objectives',
-                        textAfter: 'This is text for the second objective'
-                      },
-                      {
-                        textToReplace: 'This is text for the second objective',
-                        textReplacement: 'Objective 2: Collect feedback from at least 100 participants.',
-                        reason: 'George: Added clarity and a measurable target.',
-                        textBefore: 'This is text for the first objective',
-                        textAfter: 'This is text for the third objective'
-                      },
-                      {
-                        textToReplace: 'This is text for the third objective',
-                        textReplacement: 'Objective 3: Analyze the impact of the new methodology.',
-                        reason: 'George: Made the objective actionable and relevant.',
-                        textBefore: 'This is text for the second objective',
-                        textAfter: 'Methodology'
+                  onClick={async () => {
+                    // Dynamically import default suggestions from JSON file
+                    const resp = await fetch("/default-suggestions.json");
+                    if (resp.ok) {
+                      const defaultSuggestions = await resp.json();
+                      if (Array.isArray(defaultSuggestions) && defaultSuggestions.length > 0) {
+                        setNewSuggestions(prev => [...prev, ...defaultSuggestions]);
+                      } else {
+                        alert("No default suggestions found");
                       }
-                    ];
-                    setSuggestions([...suggestions, ...defaultSuggestions]);
+                    } else {
+                      alert("Failed to load default suggestions");
+                    }
                   }}
                 >
                   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -323,13 +314,35 @@ export default function Home() {
             </div>
             {/* Editor for current page */}
             <div className="w-full focus-outline-none" >
-              <ProseMirrorDemo
-                initialSuggestions={suggestions}
+              <SuggestionEditor
+                initialContent={initialContent}
+                newSuggestions={newSuggestions}
                 styleMode={styleMode}
-                // Pass content change handler to update section options
-                // @ts-ignore: ProseMirrorDemo does not declare onContentChange prop, but SuggestionEditor does
                 onContentChange={handleEditorContentChange}
               />
+            </div>
+            {/* Validate Button and Results */}
+            <div className="w-full flex flex-col items-center mt-6">
+              <button
+                type="button"
+                className="px-4 py-2 border border-gray-300 rounded-md hover:bg-gray-50 transition-colors text-sm font-medium bg-white"
+                onClick={handleValidateSections}
+              >
+                Validate Sections
+              </button>
+              {validationResult && (
+                <div className={`mt-4 w-full max-w-lg p-4 rounded ${validationResult.valid ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
+                  {validationResult.valid ? (
+                    <span>All sections are valid!</span>
+                  ) : (
+                    <ul className="list-disc pl-5">
+                      {validationResult.errors.map((err, idx) => (
+                        <li key={idx}>{err}</li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+              )}
             </div>
           </div>
         </section>

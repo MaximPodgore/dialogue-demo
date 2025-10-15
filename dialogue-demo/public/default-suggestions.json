@@ -1,0 +1,37 @@
+[
+  {
+    "textToReplace": "This is a background that Evil-George generated for the study. This should give someone a good idea of the reasons behind this study. Hypothetically should this text be editable at all ?",
+    "textReplacement": "This background provides context and rationale for the study, helping readers understand its purpose.",
+    "reason": "Clarified the background for better readability and professionalism.",
+    "textBefore": "Background",
+    "textAfter": "Objectives"
+  },
+  {
+    "textToReplace": "This are objectives that George generated for the study. This should give someone a good idea of the goals behind this study. Hypothetically should this text be editable at all ? Hmmm.",
+    "textReplacement": "These objectives outline the specific goals of the study, providing clear direction for the research.",
+    "reason": "Improved grammar and clarified the objectives section.",
+    "textBefore": "Objectives",
+    "textAfter": "This is text for the first objective"
+  },
+  {
+    "textToReplace": "This is text for the second objective",
+    "textReplacement": "Objective 2: Collect feedback from at least 100 participants.",
+    "reason": "Added clarity and a measurable target.",
+    "textBefore": "This is text for the first objective",
+    "textAfter": "This is text for the third objective"
+  },
+  {
+    "textToReplace": "This is text for the third objective",
+    "textReplacement": "Objective 3: Analyze the impact of the new methodology.",
+    "reason": "Made the objective actionable and relevant.",
+    "textBefore": "This is text for the second objective",
+    "textAfter": "Methodology"
+  },
+  {
+    "textToReplace": "Methodology",
+    "textReplacement": "Methodology bad",
+    "reason": "Testing rejection logic",
+    "textBefore": "This is text for the third objective",
+    "textAfter": "Lorem ipsum"
+  }
+]

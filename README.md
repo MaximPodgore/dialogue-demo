@@ -2,6 +2,8 @@
 
 Uses ProseMirror plus [suggestion-mode package](https://github.com/davefowler/prosemirror-suggestion-mode) for easy diff tracking, visualization, and ui/ux interaction.
 
+Note: if textToReplace has a `<br>` in it, the pkg does not see it as a match
+
 ## Todo
 
 - [x] Llm diff functionality 
@@ -28,7 +30,7 @@ Uses ProseMirror plus [suggestion-mode package](https://github.com/davefowler/pr
 - [x] React form validation
 - [x] Form's field logic
 - [x] Change some ui/ux elements
-- [ ] Form to suggestion logic
+- [x] Form to suggestion logic
 - [ ] suggestion pop stays on click (actually really hard)
 
 
