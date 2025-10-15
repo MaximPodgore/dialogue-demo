@@ -269,6 +269,7 @@ const SuggestionEditor = ({
           const { node } = posMap[i] as PosMapEntry;
           if (node.marks && node.marks.some((m: any) => m.type.name === 'strong')) {
             isBoldInReplace = true;
+              console.log('Bold detected in replacement text for suggestion:', suggestion);
             break;
           }
         }
@@ -300,6 +301,7 @@ const SuggestionEditor = ({
             const { node } = posMap[i] as PosMapEntry;
             if (node.marks && node.marks.some((m: any) => m.type.name === 'strong')) {
               isBoldInReplace = true;
+                console.log('Bold detected in replacement text for suggestion:', suggestion);
               break;
             }
           }
