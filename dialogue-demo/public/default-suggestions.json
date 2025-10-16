@@ -1,13 +1,5 @@
 [
   {
-    "textToReplace": "This is a background that Evil-George generated for the study. This should give someone a good idea of the reasons behind this study. Hypothetically should this text be editable at all ?",
-    "textReplacement": "This background provides context and rationale for the study, helping readers understand its purpose.",
-    "reason": "Clarified the background for better readability and professionalism.",
-    "textBefore": "Background",
-    "textAfter": "Objectives",
-    "username": "George, Dialogue AI"
-  },
-  {
     "textToReplace": "This are objectives that George generated for the study. This should give someone a good idea of the goals behind this study. Hypothetically should this text be editable at all ? Hmmm.",
     "textReplacement": "These objectives outline the specific goals of the study, providing clear direction for the research.",
     "reason": "Improved grammar and clarified the objectives section.",

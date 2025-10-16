@@ -15,9 +15,13 @@ export function processSuggestionRejection(
   schema: any,
   newSuggestions: TextSuggestion[]
 ) {
-  if (!view || !modules || !schema || !newSuggestions || newSuggestions.length === 0) return;
+  if (!view || !modules || !schema || !newSuggestions || newSuggestions.length === 0) {
+    console.log('[processSuggestionRejection] Skipping: missing view/modules/schema/suggestions');
+    return;
+  }
   const { applySuggestion } = modules;
   newSuggestions.forEach((suggestion) => {
+    console.log('[processSuggestionRejection] Processing suggestion');
     const { textToReplace, textBefore, textAfter, username } = suggestion;
     let docText = '';
     type PosMapEntry = { pos: number; node: any };
@@ -42,26 +46,11 @@ export function processSuggestionRejection(
       idx = docText.indexOf(textToReplace, idx + 1);
     }
     if (matchIndices.length === 0) {
+      console.log('[processSuggestionRejection] No match found, applying suggestion:', suggestion);
       applySuggestion(view, suggestion, username || 'Not specified');
       return;
     }
-    if (matchIndices.length === 1) {
-      const replaceIdx = matchIndices[0];
-      let isBoldInReplace = false;
-      for (let i = replaceIdx; i < replaceIdx + textToReplace.length; i++) {
-        const { node } = posMap[i] as PosMapEntry;
-        if (node.marks && node.marks.some((m: any) => m.type.name === 'strong')) {
-          isBoldInReplace = true;
-          console.log('Bold detected in replacement text for suggestion:', suggestion);
-          break;
-        }
-      }
-      if (!isBoldInReplace) {
-        applySuggestion(view, suggestion, username || 'George, Dialogue AI');
-      }
-      return;
-    }
-    for (const replaceIdx of matchIndices) {
+    matchIndices.forEach((replaceIdx) => {
       let beforeOk = true;
       let afterOk = true;
       if (textBefore) {
@@ -69,6 +58,9 @@ export function processSuggestionRejection(
         const beforeIdx = docText.lastIndexOf(textBefore, replaceIdx);
         if (beforeIdx !== -1 && beforeIdx + textBefore.length === replaceIdx) {
           beforeOk = true;
+          //console.log('[processSuggestionRejection] textBefore matches for suggestion:', suggestion);
+        } else {
+          //console.log('[processSuggestionRejection] textBefore does NOT match for suggestion:', suggestion);
         }
       }
       if (textAfter) {
@@ -76,6 +68,9 @@ export function processSuggestionRejection(
         const afterIdx = docText.indexOf(textAfter, replaceIdx + textToReplace.length);
         if (afterIdx !== -1 && replaceIdx + textToReplace.length === afterIdx) {
           afterOk = true;
+          //console.log('[processSuggestionRejection] textAfter matches for suggestion:', suggestion);
+        } else {
+          //console.log('[processSuggestionRejection] textAfter does NOT match for suggestion:', suggestion);
         }
       }
       if (beforeOk && afterOk) {
@@ -84,15 +79,19 @@ export function processSuggestionRejection(
           const { node } = posMap[i] as PosMapEntry;
           if (node.marks && node.marks.some((m: any) => m.type.name === 'strong')) {
             isBoldInReplace = true;
-            console.log('Bold detected in replacement text for suggestion:', suggestion);
+            console.log('Rejecting [processSuggestionRejection], Bold detected in replacement text for suggestion');
             break;
           }
         }
         if (!isBoldInReplace) {
+          console.log('[processSuggestionRejection] Applying suggestion (no bold detected):', suggestion);
           applySuggestion(view, suggestion, username || 'Not specified');
-          break;
+        } else {
+          console.log('[processSuggestionRejection] Suggestion not applied due to bold text:', suggestion);
         }
+      } else {
+        console.log('[processSuggestionRejection] Suggestion applied (even tho it couldnt match beforeText/afterText):', suggestion);
       }
-    }
+    });
   });
 }

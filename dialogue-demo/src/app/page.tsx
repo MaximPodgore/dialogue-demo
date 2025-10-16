@@ -51,7 +51,7 @@ export default function Home() {
     if (sections.length > 0) {
       setField(sections[0].title);
       setCurrentValue(sections[0].text);
-      setNewValue(sections[0].text);
+      setNewValue('');
     }
   }, []);
 
@@ -67,33 +67,25 @@ export default function Home() {
     setValidationResult(result);
   };
 
-  // Always update sectionOptions and currentValue when editorContent changes
-  // This is how we keep the form in sync with latest editor content
+  // Only update sectionOptions when editorContent changes, not currentValue/newValue
   React.useEffect(() => {
     if (!editorContent || editorContent.trim().length === 0) return;
-    //console.log('Sections effect triggered with editorContent:');
     const sections = getBoldSectionsText(editorContent);
     setSectionOptions(sections);
-    // If field is set, update currentValue and newValue to match new section text
-    if (sections.length > 0) {
-      const selected = sections.find(s => s.title === field) || sections[0];
-      setField(selected.title);
-      setCurrentValue(selected.text);
-      setNewValue(selected.text);
-    }
+    // Do not update currentValue/newValue here
   }, [editorContent]);
 
-  // When field changes, update newValue to current section text
+  // When field changes, update currentValue and newValue to current section text
   const handleFieldChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     const selectedTitle = e.target.value;
     setField(selectedTitle);
-    // Always extract latest section text from editorContent
+    // Extract latest section text from editorContent
     if (!editorContent || editorContent.trim().length === 0) return;
     const sections = getBoldSectionsText(editorContent);
     const section = sections.find(s => s.title === selectedTitle);
     const text = section ? section.text : '';
-    setCurrentValue(text);
-    setNewValue(text);
+  setCurrentValue(text);
+  setNewValue('');
   };
 
   // When dropdown is opened, refresh sectionOptions from latest editorContent (fallback to initialContent)
@@ -101,12 +93,11 @@ export default function Home() {
     if (!editorContent || editorContent.trim().length === 0) return;
     const sections = getBoldSectionsText(editorContent);
     setSectionOptions(sections);
-    // If current field is not in new sections, reset to first
-    if (sections.length > 0) {
-      const selected = sections.find(s => s.title === field) || sections[0];
-      setField(selected.title);
-      setCurrentValue(selected.text);
-      setNewValue(selected.text);
+    // Only change field/currentValue if current field is missing
+    if (sections.length > 0 && !sections.some(s => s.title === field)) {
+      setField(sections[0].title);
+      setCurrentValue(sections[0].text);
+      setNewValue('');
     }
   };
 
@@ -148,7 +139,13 @@ export default function Home() {
                 <textarea
                   name="currentValue"
                   value={currentValue}
-                  readOnly
+                  onChange={e => {
+                    setCurrentValue(e.target.value);
+                    if (e.target) {
+                      e.target.style.height = 'auto';
+                      e.target.style.height = e.target.scrollHeight + 'px';
+                    }
+                  }}
                   className="w-full text-black resize-none focus:outline-none"
                   rows={1}
                   style={{ minHeight: '48px', overflowWrap: 'break-word' }}
@@ -283,15 +280,16 @@ export default function Home() {
                 )}
               </div>
               
-              {/* Save button */}
+              
+              {/* Save button
               <button className="px-4 py-2 border border-gray-300 rounded-md hover:bg-gray-50 transition-colors text-sm font-medium bg-white">
                 Save
               </button>
               
-              {/* Publish button */}
+        
               <button className="px-4 py-2 bg-primary hover:bg-gray-800 text-white rounded-md font-medium text-sm">
                 Publish
-              </button>
+              </button> */}
             </div>
           </div>
           

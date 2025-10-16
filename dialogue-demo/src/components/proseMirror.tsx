@@ -2,6 +2,7 @@
 
 import React, { useEffect, useRef, useState } from 'react';
 import { processSuggestionRejection } from "../utils/suggestionRejection";
+import { applySuggestion } from "../utils/applySuggestion";
 
 export interface TextSuggestion {
   textToReplace: string;
@@ -54,8 +55,7 @@ const SuggestionEditor = ({
           suggestionModePlugin,
           acceptAllSuggestions,
           rejectAllSuggestions,
-          addSuggestionMarks,
-          applySuggestion,
+          addSuggestionMarks
         },
       ] = await Promise.all([
         import('prosemirror-state'),
@@ -216,12 +216,17 @@ const SuggestionEditor = ({
   // Apply all new suggestions each time newSuggestions changes
   // Move suggestion rejection logic to a utility function for readability
   useEffect(() => {
-    processSuggestionRejection(
-      viewRef.current,
-      modulesRef.current,
-      schemaRef.current,
-      newSuggestions
-    );
+    console.log('[SuggestionEditor] newSuggestions:', newSuggestions);
+    // Use our custom applySuggestion for better logging
+    if (viewRef.current && newSuggestions && Array.isArray(newSuggestions)) {
+      processSuggestionRejection(
+        viewRef.current,
+        modulesRef.current,
+        schemaRef.current,
+        newSuggestions
+      );
+    }
+    
   }, [newSuggestions]);
 
   return (
