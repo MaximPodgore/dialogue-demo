@@ -219,12 +219,14 @@ const SuggestionEditor = ({
     console.log('[SuggestionEditor] newSuggestions:', newSuggestions);
     // Use our custom applySuggestion for better logging
     if (viewRef.current && newSuggestions && Array.isArray(newSuggestions)) {
-      processSuggestionRejection(
-        viewRef.current,
-        modulesRef.current,
-        schemaRef.current,
-        newSuggestions
-      );
+      // Loop through each suggestion and apply it
+      newSuggestions.forEach(suggestion => {
+        if (modulesRef.current && modulesRef.current.applySuggestion) {
+          // Username can be passed from suggestion or fallback
+          const username = suggestion.username || 'example user';
+          modulesRef.current.applySuggestion(viewRef.current, suggestion, username);
+        }
+      });
     }
     
   }, [newSuggestions]);

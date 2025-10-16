@@ -197,21 +197,21 @@ export default function Home() {
               <div className="flex justify-end">
                 <button
                   type="button"
-                  className="p-3 bg-black hover:bg-gray-800 text-white rounded-md font-small"
-                  onClick={async () => {
-                    // Dynamically import default suggestions from JSON file
-                    const resp = await fetch("/default-suggestions.json");
-                    if (resp.ok) {
-                      const defaultSuggestions = await resp.json();
-                      if (Array.isArray(defaultSuggestions) && defaultSuggestions.length > 0) {
-                        setNewSuggestions(prev => [...prev, ...defaultSuggestions]);
-                      } else {
-                        alert("No default suggestions found");
-                      }
-                    } else {
-                      alert("Failed to load default suggestions");
-                    }
-                  }}
+                  className="p-3 bg-black text-white rounded-md font-small"
+                  // onClick={async () => {
+                  //   // Dynamically import default suggestions from JSON file
+                  //   const resp = await fetch("/default-suggestions.json");
+                  //   if (resp.ok) {
+                  //     const defaultSuggestions = await resp.json();
+                  //     if (Array.isArray(defaultSuggestions) && defaultSuggestions.length > 0) {
+                  //       setNewSuggestions(prev => [...prev, ...defaultSuggestions]);
+                  //     } else {
+                  //       alert("No default suggestions found");
+                  //     }
+                  //   } else {
+                  //     alert("Failed to load default suggestions");
+                  //   }
+                  // }}
                 >
                   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />
