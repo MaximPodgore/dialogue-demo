@@ -3,6 +3,10 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { processSuggestionRejection } from "../utils/suggestionRejection";
 import { applySuggestion } from "../utils/applySuggestion";
+import type { EditorView } from 'prosemirror-view';
+import { acceptSuggestionsInRange, rejectSuggestionsInRange } from 'prosemirror-suggestion-mode';
+import type { Command } from 'prosemirror-state';
+import { get } from 'http';
 
 export interface TextSuggestion {
   textToReplace: string;
@@ -37,6 +41,19 @@ const SuggestionEditor = ({
   // Store loaded modules and schema for reuse
   const modulesRef = useRef<any>(null);
   const schemaRef = useRef<any>(null);
+
+  // Add a state to maintain the persistent list of suggestions
+  const [persistentSuggestions, setPersistentSuggestions] = useState<TextSuggestion[]>([]);
+  // Add a state to track newUniqueSuggestions
+  const [newUniqueSuggestions, setNewUniqueSuggestions] = useState<TextSuggestion[]>([]);
+
+  // Use a ref to store the latest persistentSuggestions
+  const persistentSuggestionsRef = useRef(persistentSuggestions);
+
+  // Update the persistentSuggestions ref whenever persistentSuggestions state changes
+  useEffect(() => {
+    persistentSuggestionsRef.current = persistentSuggestions;
+  }, [persistentSuggestions]);
 
   // Initialize editor only once
   useEffect(() => {
@@ -151,12 +168,65 @@ const SuggestionEditor = ({
           },
         },
       });
+      // Ported createButtonsComponent from hoverMenu.ts and attached setPersistentSuggestions
+      const createButtonsComponent = (
+        from: number,
+        to: number,
+        handler: { dispatch: (command: Command) => void }
+      ): { dom: HTMLElement } => {
+        const container = document.createElement('div');
+        container.className = 'hover-menu-buttons';
+
+        const acceptButton = document.createElement('button');
+        acceptButton.textContent = 'Accept';
+        acceptButton.className = 'accept-button';
+        acceptButton.onclick = () => {
+          console.log('Accept button clicked');
+          console.log('Current persistentSuggestions before accept:', persistentSuggestionsRef.current);
+          handler.dispatch(acceptSuggestionsInRange(from, to));
+          setPersistentSuggestions((prev) => {
+            const updated = prev.filter((s) => {
+              const textInRange = viewRef.current.state.doc.textBetween(from, to, '');
+              const isMatch = textInRange === s.textToReplace || textInRange === s.textReplacement;
+              console.log('Text in range:', textInRange, 'Expected textToReplace:', s.textToReplace, 'Expected textReplacement:', s.textReplacement, 'isMatch:', isMatch);
+              return !isMatch;
+            });
+            console.log('Updated persistentSuggestions after accept:', updated);
+            return updated;
+          });
+        };
+
+        const rejectButton = document.createElement('button');
+        rejectButton.textContent = 'Reject';
+        rejectButton.className = 'reject-button';
+        rejectButton.onclick = () => {
+          console.log('Reject button clicked');
+          console.log('Current persistentSuggestions before reject:', persistentSuggestionsRef.current);
+          handler.dispatch(rejectSuggestionsInRange(from, to));
+          setPersistentSuggestions((prev) => {
+            const updated = prev.filter((s) => {
+              const textInRange = viewRef.current.state.doc.textBetween(from, to, '');
+              const isMatch = textInRange === s.textToReplace || textInRange === s.textReplacement;
+              console.log('Text in range:', textInRange, 'Expected textToReplace:', s.textToReplace, 'Expected textReplacement:', s.textReplacement, 'isMatch:', isMatch);
+              return !isMatch;
+            });
+            console.log('Updated persistentSuggestions after reject:', updated);
+            return updated;
+          });
+        };
+
+        container.appendChild(acceptButton);
+        container.appendChild(rejectButton);
+        return { dom: container };
+      };
+
       const suggestionPlugin = suggestionModePlugin({
         username: 'example user',
         inSuggestionMode: false,
         hoverMenuOptions: {
           components: {
             createInfoComponent: createSuggestionReasonComponent,
+            createButtonsComponent,
           },
         },
       });
@@ -213,22 +283,70 @@ const SuggestionEditor = ({
     };
   }, []);
 
-  // Apply all new suggestions each time newSuggestions changes
-  // Move suggestion rejection logic to a utility function for readability
+  // Update newUniqueSuggestions when newSuggestions changes
   useEffect(() => {
-    console.log('[SuggestionEditor] newSuggestions:', newSuggestions);
-    // Use our custom applySuggestion for better logging
-    if (viewRef.current && newSuggestions && Array.isArray(newSuggestions)) {
-      // Loop through each suggestion and apply it
-      newSuggestions.forEach(suggestion => {
+    if (newSuggestions && Array.isArray(newSuggestions)) {
+      console.log('[SuggestionEditor] Received newSuggestions:', newSuggestions);
+      const uniqueSuggestions = newSuggestions.filter((newSuggestion) => {
+        const isDuplicate = persistentSuggestions.some(
+          (existing) =>
+            existing.textToReplace === newSuggestion.textToReplace &&
+            existing.textReplacement === newSuggestion.textReplacement
+        );
+        if (isDuplicate) {
+          console.log('[SuggestionEditor] Duplicate suggestion ignored:', newSuggestion);
+        } else {
+          console.log('[SuggestionEditor] Adding new suggestion to uniqueSuggestions:', newSuggestion);
+        }
+        return !isDuplicate;
+      });
+      setNewUniqueSuggestions(uniqueSuggestions);
+    }
+  }, [newSuggestions]);
+
+  // Update persistentSuggestions when newUniqueSuggestions changes
+  useEffect(() => {
+    if (newUniqueSuggestions.length > 0) {
+      setPersistentSuggestions((prev) => {
+        const updatedSuggestions = [...prev, ...newUniqueSuggestions];
+        console.log('[SuggestionEditor] Updated persistentSuggestions:', updatedSuggestions);
+        return updatedSuggestions;
+      });
+    }
+  }, [newUniqueSuggestions]);
+
+  // Apply suggestions from the newUniqueSuggestions
+  useEffect(() => {
+    if (viewRef.current && newUniqueSuggestions.length > 0) {
+      newUniqueSuggestions.forEach((suggestion) => {
         if (modulesRef.current && modulesRef.current.applySuggestion) {
-          // Pass suggestion and username explicitly
           modulesRef.current.applySuggestion(viewRef.current, suggestion, suggestion.username);
         }
       });
     }
-    
-  }, [newSuggestions]);
+  }, [newUniqueSuggestions]);
+
+  // Accept all suggestions and update the persistent list
+  const acceptAll = () => {
+    if ((window as any).acceptAllSuggestions) {
+      (window as any).acceptAllSuggestions();
+      setPersistentSuggestions([]); // Clear the list after accepting all
+    }
+  };
+
+  // Reject all suggestions and update the persistent list
+  const rejectAll = () => {
+    if ((window as any).rejectAllSuggestions) {
+      (window as any).rejectAllSuggestions();
+      setPersistentSuggestions([]); // Clear the list after rejecting all
+    }
+  };
+
+  // Add a function to get the current persistentSuggestions
+  const getPersistentSuggestions = () => {
+    console.log('Current persistentSuggestions:', persistentSuggestions);
+    return persistentSuggestions;
+  };
 
   return (
     <div className={`w-full max-w-4xl mx-auto ${suggestionModeClass}`} style={{ fontFamily: "'DM Sans', sans-serif" }}>
@@ -238,21 +356,17 @@ const SuggestionEditor = ({
         style={{ fontFamily: "'DM Sans', sans-serif", lineHeight: '1.6', border: 'none', outline: 'none', boxShadow: 'none', padding: 0 }}
       />
       {/* Accept/Reject buttons - always show if newSuggestions exist */}
-      {newSuggestions && newSuggestions.length > 0 && (
+      {persistentSuggestions.length > 0 && (
         <div className="mt-4 space-x-2">
           <button
-            onClick={() => {
-              if ((window as any).acceptAllSuggestions) (window as any).acceptAllSuggestions();
-            }}
+            onClick={acceptAll}
             className="px-4 py-2 border border-gray-300 rounded-md hover:bg-gray-50 transition-colors text-sm font-medium bg-white"
             style={{ fontFamily: "'DM Sans', sans-serif" }}
           >
             Accept All
           </button>
           <button
-            onClick={() => {
-              if ((window as any).rejectAllSuggestions) (window as any).rejectAllSuggestions();
-            }}
+            onClick={rejectAll}
             className="px-4 py-2 border border-gray-300 rounded-md hover:bg-gray-50 transition-colors text-sm font-medium bg-white"
             style={{ fontFamily: "'DM Sans', sans-serif" }}
           >
