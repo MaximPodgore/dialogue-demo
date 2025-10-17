@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useRef } from "react";
 
 import SuggestionEditor from "@/components/proseMirror";
 import { TextSuggestion } from "@/components/proseMirror";
@@ -25,6 +25,11 @@ export default function Home() {
   const [validationResult, setValidationResult] = useState<{ valid: boolean; errors: string[] } | null>(null);
   // Section titles and text
   const [sectionOptions, setSectionOptions] = useState<{ title: string; text: string }[]>([]);
+  // Add state to track persistent suggestions
+  const [persistentSuggestions, setPersistentSuggestions] = useState<TextSuggestion[]>([]);
+
+  // Shared sections variable
+  const sectionsRef = useRef<{ title: string; text: string }[]>([]);
 
   // Initial content from ProseMirrorDemo 
   const initialContent = `
@@ -44,22 +49,16 @@ export default function Home() {
     <p>Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum</p>
   `;
 
-  // Populate sectionOptions on initial render
-  React.useEffect(() => {
-    const sections = getBoldSectionsText(initialContent);
-    setSectionOptions(sections);
-    if (sections.length > 0) {
-      setField(sections[0].title);
-      setCurrentValue(sections[0].text);
-      setNewValue('');
-    }
-  }, []);
-
-  // Handler for content change from ProseMirrorDemo
-  const handleEditorContentChange = (content: string) => {
-    setEditorContent(content);
-    //console.log('Editor content updated in page.tsx:');
-  };
+  // // Populate sectionOptions on initial render
+  // React.useEffect(() => {
+  //   const sections = getBoldSectionsText(initialContent);
+  //   setSectionOptions(sections);
+  //   if (sections.length > 0) {
+  //     setField(sections[0].title);
+  //     setCurrentValue(sections[0].text);
+  //     setNewValue('');
+  //   }
+  // }, []);
 
   // Validate button handler
   const handleValidateSections = () => {
@@ -67,36 +66,26 @@ export default function Home() {
     setValidationResult(result);
   };
 
-  // Only update sectionOptions when editorContent changes, not currentValue/newValue
-  React.useEffect(() => {
-    if (!editorContent || editorContent.trim().length === 0) return;
-    const sections = getBoldSectionsText(editorContent);
-    setSectionOptions(sections);
-    // Do not update currentValue/newValue here
-  }, [editorContent]);
 
   // When field changes, update currentValue and newValue to current section text
   const handleFieldChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     const selectedTitle = e.target.value;
     setField(selectedTitle);
-    // Extract latest section text from editorContent
-    if (!editorContent || editorContent.trim().length === 0) return;
-    const sections = getBoldSectionsText(editorContent);
-    const section = sections.find(s => s.title === selectedTitle);
+    // Use shared sections variable
+    const section = sectionsRef.current.find(s => s.title === selectedTitle);
     const text = section ? section.text : '';
-  setCurrentValue(text);
-  setNewValue('');
+    setCurrentValue(text);
+    setNewValue('');
   };
 
   // When dropdown is opened, refresh sectionOptions from latest editorContent (fallback to initialContent)
   const handleFieldDropdownOpen = () => {
-    if (!editorContent || editorContent.trim().length === 0) return;
-    const sections = getBoldSectionsText(editorContent);
-    setSectionOptions(sections);
+    // Use shared sections variable
+    if (sectionsRef.current.length === 0) return;
     // Only change field/currentValue if current field is missing
-    if (sections.length > 0 && !sections.some(s => s.title === field)) {
-      setField(sections[0].title);
-      setCurrentValue(sections[0].text);
+    if (!sectionsRef.current.some(s => s.title === field)) {
+      setField(sectionsRef.current[0].title);
+      setCurrentValue(sectionsRef.current[0].text);
       setNewValue('');
     }
   };
@@ -111,6 +100,57 @@ export default function Home() {
     // Do not clear the form fields after submission
   };
 
+  const handlePersistentSuggestionsChange = (sectionArray: { title: string; text: string }[]) => {
+    if (!sectionArray || sectionArray.length === 0) {
+      console.log('[handlePersistentSuggestionsChange] Null or empty sectionArray, preserving current state.');
+      return; // Do not update state if sectionArray is null or empty
+    }
+    console.log('[handlePersistentSuggestionsChange] Received sectionArray:', sectionArray);
+
+    const sectionMap: Record<string, string> = sectionArray.reduce((acc, { title, text }) => {
+    acc[title] = text;
+    return acc;
+  }, {} as Record<string, string>);
+
+  console.log('[handlePersistentSuggestionsChange] Converted sectionMap:', sectionMap);
+
+  // Create updatedSections array again if needed
+  const updatedSections = Object.entries(sectionMap).map(([title, text]) => ({
+    title,
+    text,
+  }));
+    console.log('[handlePersistentSuggestionsChange] Correctly mapped sections after type fix:', updatedSections);
+    sectionsRef.current = updatedSections; // Update shared sections variable
+    setSectionOptions(updatedSections);
+
+    console.log('[handlePersistentSuggestionsChange] Updated sections:', updatedSections);
+
+    if (updatedSections.length > 0) {
+      const currentField = updatedSections.find(section => section.title === field);
+      console.log('[handlePersistentSuggestionsChange] Current field:', currentField);
+
+      if (currentField) {
+        setCurrentValue(currentField.text);
+      } else {
+        console.log('[handlePersistentSuggestionsChange] Current field not found, defaulting to first section.');
+        setField(updatedSections[0].title);
+        setCurrentValue(updatedSections[0].text);
+      }
+    } else {
+      console.log('[handlePersistentSuggestionsChange] No sections available, clearing state.');
+      setField('');
+      setCurrentValue('');
+    }
+  };
+
+  // Remove MutationObserver and rely on SuggestionEditor for updates
+  React.useEffect(() => {
+    // Cleanup logic if needed
+  }, [field, persistentSuggestions]);
+
+  const handleContentChange = (sectionArray: { title: string; text: string }[]) => {
+    handlePersistentSuggestionsChange(sectionArray);
+  };
 
   return (
     <main className="bg-pageBg h-screen overflow-hidden">
@@ -319,7 +359,7 @@ export default function Home() {
                 initialContent={initialContent}
                 newSuggestions={newSuggestions}
                 styleMode={styleMode}
-                onContentChange={handleEditorContentChange}
+                onContentChange={handleContentChange}
               />
             </div>
             {/* Validate Button and Results */}
