@@ -175,40 +175,36 @@ const SuggestionEditor = ({
         handler: { dispatch: (command: Command) => void }
       ): { dom: HTMLElement } => {
         const container = document.createElement('div');
-        container.className = 'hover-menu-buttons';
+        container.className = 'flex gap-2'; // Ensure buttons are horizontally stacked with spacing
 
-        // Update the acceptButton and rejectButton click handlers
         const acceptButton = document.createElement('button');
         acceptButton.textContent = 'Accept';
-        acceptButton.className = 'accept-button';
+        acceptButton.className = 'bg-transparent text-black border border-gray-300 px-3 py-1.5 pl-8 rounded-md text-sm font-medium relative transition-all duration-150 ease-in-out hover:bg-gray-50 hover:border-gray-400';
+        const acceptIcon = document.createElement('span');
+        acceptIcon.className = 'absolute left-2 top-1/2 transform -translate-y-1/2 w-4 h-4 bg-no-repeat bg-contain';
+        acceptIcon.style.backgroundImage = "url('data:image/svg+xml,%3Csvg xmlns=\"http://www.w3.org/2000/svg\" fill=\"none\" viewBox=\"0 0 24 24\" stroke-width=\"2\" stroke=\"%23000\"%3E%3Cpath stroke-linecap=\"round\" stroke-linejoin=\"round\" d=\"M5 13l4 4L19 7\"/%3E%3C/svg%3E')";
+        acceptButton.appendChild(acceptIcon);
         acceptButton.onclick = () => {
           console.log('Accept button clicked');
-          
           const suggestionData = getSuggestionTextFromRange(
             viewRef.current.state.doc,
             from,
             to
           );
-          
           console.log('Suggestion data:', suggestionData);
-          
           handler.dispatch(acceptSuggestionsInRange(from, to));
-          
           setPersistentSuggestions((prev) => {
             const updated = prev.filter((s) => {
-              // Match based on the actual suggestion data
               const isMatch = 
                 (suggestionData.textReplacement === s.textReplacement &&
                  suggestionData.suggestionType === 'insert') ||
                 (suggestionData.textToReplace === s.textToReplace &&
                  suggestionData.suggestionType === 'delete');
-              
               console.log('Comparing:',
                 '\n  Found:', suggestionData,
                 '\n  Expected:', { textToReplace: s.textToReplace, textReplacement: s.textReplacement },
                 '\n  isMatch:', isMatch
               );
-              
               return !isMatch;
             });
             console.log('Updated persistentSuggestions after accept:', updated);
@@ -218,20 +214,20 @@ const SuggestionEditor = ({
 
         const rejectButton = document.createElement('button');
         rejectButton.textContent = 'Reject';
-        rejectButton.className = 'reject-button';
+        rejectButton.className = 'bg-transparent text-black border border-gray-300 px-3 py-1.5 pl-8 rounded-md text-sm font-medium relative transition-all duration-150 ease-in-out hover:bg-gray-50 hover:border-gray-400';
+        const rejectIcon = document.createElement('span');
+        rejectIcon.className = 'absolute left-2 top-1/2 transform -translate-y-1/2 w-4 h-4 bg-no-repeat bg-contain';
+        rejectIcon.style.backgroundImage = "url('data:image/svg+xml,%3Csvg xmlns=\"http://www.w3.org/2000/svg\" fill=\"none\" viewBox=\"0 0 24 24\" stroke-width=\"2\" stroke=\"%23000\"%3E%3Cpath stroke-linecap=\"round\" stroke-linejoin=\"round\" d=\"M6 18L18 6M6 6l12 12\"/%3E%3C/svg%3E')";
+        rejectButton.appendChild(rejectIcon);
         rejectButton.onclick = () => {
           console.log('Reject button clicked');
-          
           const suggestionData = getSuggestionTextFromRange(
             viewRef.current.state.doc,
             from,
             to
           );
-          
           console.log('Suggestion data:', suggestionData);
-          
           handler.dispatch(rejectSuggestionsInRange(from, to));
-          
           setPersistentSuggestions((prev) => {
             const updated = prev.filter((s) => {
               const isMatch = 
@@ -239,13 +235,11 @@ const SuggestionEditor = ({
                  suggestionData.suggestionType === 'insert') ||
                 (suggestionData.textToReplace === s.textToReplace &&
                  suggestionData.suggestionType === 'delete');
-              
               console.log('Comparing:',
                 '\n  Found:', suggestionData,
                 '\n  Expected:', { textToReplace: s.textToReplace, textReplacement: s.textReplacement },
                 '\n  isMatch:', isMatch
               );
-              
               return !isMatch;
             });
             console.log('Updated persistentSuggestions after reject:', updated);
