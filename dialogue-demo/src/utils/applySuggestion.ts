@@ -29,8 +29,13 @@ const applySuggestionToRange = (
     username,
     skipSuggestionOperation: false,
   });
-
-  tr.replaceWith(from, to, view.state.schema.text(suggestion.textReplacement));
+  console.log("Suggestion textReplacement:", suggestion.textReplacement);
+  if (!suggestion.textReplacement || suggestion.textReplacement.trim() === '') {
+    // Use deletion if textReplacement is null or empty string
+    tr.delete(from, to);
+  } else {
+    tr.replaceWith(from, to, view.state.schema.text(suggestion.textReplacement));
+  }
   dispatch(tr);
   console.log('[applySuggestion] Applied suggestion:', {
     from,
@@ -43,7 +48,7 @@ const applySuggestionToRange = (
 
 export const createApplySuggestionCommand = (
   {
-    textToReplace,
+    textToReplace = '',
     textReplacement = '',
     reason = '',
     textBefore = '',
@@ -56,85 +61,19 @@ export const createApplySuggestionCommand = (
     dispatch?: (tr: Transaction) => void,
     view?: EditorView
   ): boolean => {
-    if (textToReplace === undefined) {
-      console.warn('[applySuggestion] Type error - Undefined textToReplace');
+    if (textToReplace === undefined || textToReplace === null) {
+      console.warn('[applySuggestion] Type error - Undefined or null textToReplace');
       return false;
     }
-
-    // If both textBefore and textAfter are provided, match anything between them
-    if (textBefore && textAfter) {
-      const pattern = escapeRegExp(textBefore) + '(.*?)' + escapeRegExp(textAfter);
-      const regex = new RegExp(pattern, 'g');
-      const docText = state.doc.textContent;
-      let match;
-      let matches: { index: number; length: number; inner: string; innerStart: number; innerEnd: number }[] = [];
-      let matchCount = 0;
-      const MAX_MATCHES = 1000;
-      console.log('[applySuggestion] Searching for between matches:', { textBefore, textAfter, pattern, docText });
-      while ((match = regex.exec(docText)) !== null) {
-        if (match.index === regex.lastIndex) {
-          regex.lastIndex++;
-        }
-        matchCount++;
-        if (matchCount > MAX_MATCHES) {
-          console.warn('[applySuggestion] Too many matches found, stopping');
-          break;
-        }
-        // match[1] is the inner text between before/after
-        const innerStart = match.index + match[0].indexOf(match[1]);
-        const innerEnd = innerStart + match[1].length;
-        matches.push({
-          index: match.index,
-          length: match[0].length,
-          inner: match[1],
-          innerStart,
-          innerEnd,
-        });
-        console.log('[applySuggestion] Found between match:', {
-          match: match[0],
-          inner: match[1],
-          index: match.index,
-          innerStart,
-          innerEnd,
-          matchCount,
-        });
-      }
-      console.log('[applySuggestion] Total between matches found:', matches.length, matches);
-      if (!dispatch) return matches.length === 1;
-      if (!view) return false;
-      if (matches.length > 0) {
-        if (matches.length > 1) {
-          console.warn('[applySuggestion] Multiple matches found, only applying the first', matches);
-        }
-        const applyingMatch = matches[0];
-        const docRange = findDocumentRange(state.doc, applyingMatch.innerStart, applyingMatch.innerEnd);
-        console.log('[applySuggestion] Document range for between:', docRange);
-        if (!dispatch) return true;
-        return applySuggestionToRange(
-          view,
-          dispatch,
-          docRange.from,
-          docRange.to,
-          {
-            textToReplace: applyingMatch.inner,
-            textReplacement,
-            reason,
-            textBefore,
-            textAfter,
-          },
-          username
-        );
-      }
-      console.warn('[applySuggestion] No matches found for between suggestion', {
-        suggestion: { textToReplace, textReplacement, reason, textBefore, textAfter },
-        username,
-        docText,
-      });
-      return false;
-    }
-
-    // Fallback to original strict matching
+    console.log('TextSuggestion values', {
+      textToReplace,
+      textReplacement,
+      reason,
+      textBefore,
+      textAfter,
+    });
     const searchText = textBefore + textToReplace + textAfter;
+    console.log('Searchtext:', searchText);
     if (searchText.length === 0) {
       if (state.doc.textContent.trim().replace(/\u200B/g, '').length > 0) {
         console.warn('[applySuggestion] No text to match, but doc is not empty');
@@ -285,6 +224,7 @@ export const applySuggestion = (
   username: string,
   dryRun: boolean = false
 ): boolean => {
+  console.log('This is suggestion made it to applySuggestion:', suggestion);
   const command = createApplySuggestionCommand(suggestion, username);
   if (dryRun) return command(view.state);
   return command(view.state, view.dispatch, view);

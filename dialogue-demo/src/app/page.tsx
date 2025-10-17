@@ -1,10 +1,9 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useRef } from "react";
 
 import SuggestionEditor from "@/components/proseMirror";
 import { TextSuggestion } from "@/components/proseMirror";
-import { getBoldSectionsText } from "@/utils/sectionUtils";
 import { formToSuggestion } from "@/utils/formToSuggestion";
 import { validateSectionsFromHtml } from "../utils/validateSections";
 
@@ -25,6 +24,11 @@ export default function Home() {
   const [validationResult, setValidationResult] = useState<{ valid: boolean; errors: string[] } | null>(null);
   // Section titles and text
   const [sectionOptions, setSectionOptions] = useState<{ title: string; text: string }[]>([]);
+  // Add state to track persistent suggestions
+  const [persistentSuggestions, setPersistentSuggestions] = useState<TextSuggestion[]>([]);
+
+  // Shared sections variable
+  const sectionsRef = useRef<{ title: string; text: string }[]>([]);
 
   // Initial content from ProseMirrorDemo 
   const initialContent = `
@@ -44,71 +48,98 @@ export default function Home() {
     <p>Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum</p>
   `;
 
-  // Populate sectionOptions on initial render
-  React.useEffect(() => {
-    const sections = getBoldSectionsText(initialContent);
-    setSectionOptions(sections);
-    if (sections.length > 0) {
-      setField(sections[0].title);
-      setCurrentValue(sections[0].text);
-      setNewValue('');
-    }
-  }, []);
-
-  // Handler for content change from ProseMirrorDemo
-  const handleEditorContentChange = (content: string) => {
-    setEditorContent(content);
-    //console.log('Editor content updated in page.tsx:');
-  };
-
   // Validate button handler
   const handleValidateSections = () => {
     const result = validateSectionsFromHtml(editorContent);
     setValidationResult(result);
   };
 
-  // Only update sectionOptions when editorContent changes, not currentValue/newValue
-  React.useEffect(() => {
-    if (!editorContent || editorContent.trim().length === 0) return;
-    const sections = getBoldSectionsText(editorContent);
-    setSectionOptions(sections);
-    // Do not update currentValue/newValue here
-  }, [editorContent]);
 
   // When field changes, update currentValue and newValue to current section text
   const handleFieldChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     const selectedTitle = e.target.value;
     setField(selectedTitle);
-    // Extract latest section text from editorContent
-    if (!editorContent || editorContent.trim().length === 0) return;
-    const sections = getBoldSectionsText(editorContent);
-    const section = sections.find(s => s.title === selectedTitle);
+    // Use shared sections variable
+    const section = sectionsRef.current.find(s => s.title === selectedTitle);
     const text = section ? section.text : '';
-  setCurrentValue(text);
-  setNewValue('');
+    setCurrentValue(text);
+    setNewValue('');
   };
 
   // When dropdown is opened, refresh sectionOptions from latest editorContent (fallback to initialContent)
   const handleFieldDropdownOpen = () => {
-    if (!editorContent || editorContent.trim().length === 0) return;
-    const sections = getBoldSectionsText(editorContent);
-    setSectionOptions(sections);
+    // Use shared sections variable
+    if (sectionsRef.current.length === 0) return;
     // Only change field/currentValue if current field is missing
-    if (sections.length > 0 && !sections.some(s => s.title === field)) {
-      setField(sections[0].title);
-      setCurrentValue(sections[0].text);
+    if (!sectionsRef.current.some(s => s.title === field)) {
+      setField(sectionsRef.current[0].title);
+      setCurrentValue(sectionsRef.current[0].text);
       setNewValue('');
     }
   };
 
   const handleSuggestionSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    // Use formToSuggestion to create suggestion from form data and section info, username set to "User"
-    const suggestion = formToSuggestion(sectionOptions, field, currentValue, newValue, "User");
-    setNewSuggestions(prev => [...prev, suggestion]);
+    // Use formToSuggestion to create suggestion from form data and section info
+    const suggestions = formToSuggestion(sectionOptions, field, currentValue, newValue);
+    const username = "User"; // Pass username explicitly
+    const suggestionsWithUsername = suggestions.map(suggestion => ({ ...suggestion, username }));
+    setNewSuggestions(prev => [...prev, ...suggestionsWithUsername]);
     // Do not clear the form fields after submission
   };
 
+  const handlePersistentSuggestionsChange = (sectionArray: { title: string; text: string }[]) => {
+    setNewSuggestions([]); // Clear new suggestions on persistent suggestions change
+    if (!sectionArray || sectionArray.length === 0) {
+      console.log('[handlePersistentSuggestionsChange] Null or empty sectionArray, preserving current state.');
+      return; // Do not update state if sectionArray is null or empty
+    }
+    console.log('[handlePersistentSuggestionsChange] Received sectionArray:', sectionArray);
+
+    const sectionMap: Record<string, string> = sectionArray.reduce((acc, { title, text }) => {
+    acc[title] = text;
+    return acc;
+  }, {} as Record<string, string>);
+
+  console.log('[handlePersistentSuggestionsChange] Converted sectionMap:', sectionMap);
+
+  // Create updatedSections array again if needed
+  const updatedSections = Object.entries(sectionMap).map(([title, text]) => ({
+    title,
+    text,
+  }));
+    //console.log('[handlePersistentSuggestionsChange] Correctly mapped sections after type fix:', updatedSections);
+    sectionsRef.current = updatedSections; // Update shared sections variable
+    setSectionOptions(updatedSections);
+
+    console.log('[handlePersistentSuggestionsChange] Updated sections:', updatedSections);
+
+    if (updatedSections.length > 0) {
+      const currentField = updatedSections.find(section => section.title === field);
+      console.log('[handlePersistentSuggestionsChange] Current field:', currentField);
+
+      if (currentField) {
+        setCurrentValue(currentField.text);
+      } else {
+        console.log('[handlePersistentSuggestionsChange] Current field not found, defaulting to first section.');
+        setField(updatedSections[0].title);
+        setCurrentValue(updatedSections[0].text);
+      }
+    } else {
+      console.log('[handlePersistentSuggestionsChange] No sections available, clearing state.');
+      setField('');
+      setCurrentValue('');
+    }
+  };
+
+  // Remove MutationObserver and rely on SuggestionEditor for updates
+  React.useEffect(() => {
+    // Cleanup logic if needed
+  }, [field, persistentSuggestions]);
+
+  const handleContentChange = (sectionArray: { title: string; text: string }[]) => {
+    handlePersistentSuggestionsChange(sectionArray);
+  };
 
   return (
     <main className="bg-pageBg h-screen overflow-hidden">
@@ -197,21 +228,21 @@ export default function Home() {
               <div className="flex justify-end">
                 <button
                   type="button"
-                  className="p-3 bg-black hover:bg-gray-800 text-white rounded-md font-small"
-                  onClick={async () => {
-                    // Dynamically import default suggestions from JSON file
-                    const resp = await fetch("/default-suggestions.json");
-                    if (resp.ok) {
-                      const defaultSuggestions = await resp.json();
-                      if (Array.isArray(defaultSuggestions) && defaultSuggestions.length > 0) {
-                        setNewSuggestions(prev => [...prev, ...defaultSuggestions]);
-                      } else {
-                        alert("No default suggestions found");
-                      }
-                    } else {
-                      alert("Failed to load default suggestions");
-                    }
-                  }}
+                  className="p-3 bg-black text-white rounded-md font-small"
+                  // onClick={async () => {
+                  //   // Dynamically import default suggestions from JSON file
+                  //   const resp = await fetch("/default-suggestions.json");
+                  //   if (resp.ok) {
+                  //     const defaultSuggestions = await resp.json();
+                  //     if (Array.isArray(defaultSuggestions) && defaultSuggestions.length > 0) {
+                  //       setNewSuggestions(prev => [...prev, ...defaultSuggestions]);
+                  //     } else {
+                  //       alert("No default suggestions found");
+                  //     }
+                  //   } else {
+                  //     alert("Failed to load default suggestions");
+                  //   }
+                  // }}
                 >
                   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />
@@ -317,11 +348,11 @@ export default function Home() {
                 initialContent={initialContent}
                 newSuggestions={newSuggestions}
                 styleMode={styleMode}
-                onContentChange={handleEditorContentChange}
+                onContentChange={handleContentChange}
               />
             </div>
             {/* Validate Button and Results */}
-            <div className="w-full flex flex-col items-center mt-6">
+            {/* <div className="w-full flex flex-col items-center mt-6">
               <button
                 type="button"
                 className="px-4 py-2 border border-gray-300 rounded-md hover:bg-gray-50 transition-colors text-sm font-medium bg-white"
@@ -342,7 +373,7 @@ export default function Home() {
                   )}
                 </div>
               )}
-            </div>
+            </div> */}
           </div>
         </section>
       </div>
