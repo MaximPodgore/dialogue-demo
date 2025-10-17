@@ -222,9 +222,8 @@ const SuggestionEditor = ({
       // Loop through each suggestion and apply it
       newSuggestions.forEach(suggestion => {
         if (modulesRef.current && modulesRef.current.applySuggestion) {
-          // Username can be passed from suggestion or fallback
-          const username = suggestion.username || 'example user';
-          modulesRef.current.applySuggestion(viewRef.current, suggestion, username);
+          // Pass suggestion and username explicitly
+          modulesRef.current.applySuggestion(viewRef.current, suggestion, suggestion.username);
         }
       });
     }

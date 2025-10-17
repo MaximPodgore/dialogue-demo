@@ -103,9 +103,11 @@ export default function Home() {
 
   const handleSuggestionSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    // Use formToSuggestion to create suggestion from form data and section info, username set to "User"
-    const suggestion = formToSuggestion(sectionOptions, field, currentValue, newValue, "User");
-    setNewSuggestions(prev => [...prev, suggestion]);
+    // Use formToSuggestion to create suggestion from form data and section info
+    const suggestions = formToSuggestion(sectionOptions, field, currentValue, newValue);
+    const username = "User"; // Pass username explicitly
+    const suggestionsWithUsername = suggestions.map(suggestion => ({ ...suggestion, username }));
+    setNewSuggestions(prev => [...prev, ...suggestionsWithUsername]);
     // Do not clear the form fields after submission
   };
 

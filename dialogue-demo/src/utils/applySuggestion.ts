@@ -2,7 +2,6 @@ import { EditorView } from 'prosemirror-view';
 import { suggestionTransactionKey } from 'prosemirror-suggestion-mode';
 import { Node } from 'prosemirror-model';
 import { Command, EditorState, Transaction } from 'prosemirror-state';
-import DiffMatchPatch from 'diff-match-patch';
 
 export type TextSuggestion = {
   textToReplace: string;
@@ -19,7 +18,7 @@ const applySuggestionToRange = (
   from: number,
   to: number,
   suggestion: TextSuggestion,
-  username: string,
+  username: string
 ): boolean => {
   const newData: Record<string, any> = {};
   if (suggestion.reason && suggestion.reason.length > 0) newData.reason = suggestion.reason;
@@ -30,76 +29,26 @@ const applySuggestionToRange = (
     username,
     skipSuggestionOperation: false,
   });
-
-  // Extract current text in range
-  const currentText = view.state.doc.textBetween(from, to, '\n', '\n');
-  const newText = suggestion.textReplacement;
-
-  // Use diff-match-patch to compute diffs
-  const dmp = new DiffMatchPatch();
-  const diffs = dmp.diff_main(currentText, newText);
-  dmp.diff_cleanupSemantic(diffs);
-
-  let docText = view.state.doc.textBetween(from, to, '\n', '\n');
-  let searchStart = 0;
-  let docPos = from;
-  for (const diff of diffs) {
-    const [type, text] = diff;
-    if (!text) continue;
-    // Ignore diffs that are only whitespace or newlines
-    if (/^\s*$/.test(text)) {
-      if (type === 0) searchStart += text.length;
-      continue;
-    }
-    if (type === 0 || type === -1) {
-      // For equal and deletion, find the next occurrence of text in docText
-      const foundIdx = docText.indexOf(text, searchStart);
-      if (foundIdx === -1) {
-        console.warn('[applySuggestion] Could not find text for diff placement:', text);
-        continue;
-      }
-      const range = findDocumentRange(view.state.doc, from + foundIdx, from + foundIdx + text.length);
-      if (type === 0) {
-        // Equal: just move searchStart and docPos forward
-        searchStart = foundIdx + text.length;
-        docPos = range.to;
-      } else if (type === -1) {
-        // Deletion: delete the text at the found position
-        tr.delete(range.from, range.to);
-        searchStart = foundIdx + text.length;
-        // docPos does not advance for deletion
-      }
-    } else if (type === 1) {
-      // Insertion: insert new text with suggestion mark at current docPos
-      let marks: readonly any[] = [];
-      if (view.state.schema.marks && view.state.schema.marks.suggestion) {
-        try {
-          // Replace 'attrs' with 'Attr' to fix the error
-          marks = [view.state.schema.marks.suggestion.create({ username, ...Attr })];
-        } catch (e) {
-          console.warn('[applySuggestion] Failed to create suggestion mark:', e);
-        }
-      } else {
-        console.warn('[applySuggestion] suggestion mark not found in schema, inserting plain text');
-      }
-      tr.insert(docPos, view.state.schema.text(text, marks));
-      // Do NOT advance docPos for insertions
-    }
+  console.log("Suggestion textReplacement:", suggestion.textReplacement);
+  if (!suggestion.textReplacement || suggestion.textReplacement.trim() === '') {
+    // Use deletion if textReplacement is null or empty string
+    tr.delete(from, to);
+  } else {
+    tr.replaceWith(from, to, view.state.schema.text(suggestion.textReplacement));
   }
   dispatch(tr);
-  console.log('[applySuggestion] Applied suggestion with diff:', {
+  console.log('[applySuggestion] Applied suggestion:', {
     from,
     to,
     suggestion,
     username,
-    diffs,
   });
   return true;
 };
 
 export const createApplySuggestionCommand = (
   {
-    textToReplace,
+    textToReplace = '',
     textReplacement = '',
     reason = '',
     textBefore = '',
@@ -112,48 +61,19 @@ export const createApplySuggestionCommand = (
     dispatch?: (tr: Transaction) => void,
     view?: EditorView
   ): boolean => {
-    if (textToReplace === undefined) {
-      console.warn('[applySuggestion] Type error - Undefined textToReplace');
+    if (textToReplace === undefined || textToReplace === null) {
+      console.warn('[applySuggestion] Type error - Undefined or null textToReplace');
       return false;
     }
-
-    // If both textBefore and textAfter are provided, use Quill-style diff logic
-    if (textBefore && textAfter) {
-      const docText = state.doc.textContent;
-      const beforeIdx = docText.indexOf(textBefore);
-      if (beforeIdx === -1) {
-        console.warn('[applySuggestion] textBefore not found');
-        return false;
-      }
-      const afterIdx = docText.indexOf(textAfter, beforeIdx + textBefore.length);
-      if (afterIdx === -1) {
-        console.warn('[applySuggestion] textAfter not found');
-        return false;
-      }
-      const innerStart = beforeIdx + textBefore.length;
-      const innerEnd = afterIdx;
-      const docRange = findDocumentRange(state.doc, innerStart, innerEnd);
-      if (!dispatch) return true;
-      if (!view) return false;
-      // Use diff logic between innerStart and innerEnd
-      return applySuggestionToRange(
-        view,
-        dispatch,
-        docRange.from,
-        docRange.to,
-        {
-          textToReplace: state.doc.textBetween(docRange.from, docRange.to, '\n', '\n'),
-          textReplacement,
-          reason,
-          textBefore,
-          textAfter,
-        },
-        username
-      );
-    }
-
-    // Fallback to original strict matching
+    console.log('TextSuggestion values', {
+      textToReplace,
+      textReplacement,
+      reason,
+      textBefore,
+      textAfter,
+    });
     const searchText = textBefore + textToReplace + textAfter;
+    console.log('Searchtext:', searchText);
     if (searchText.length === 0) {
       if (state.doc.textContent.trim().replace(/\u200B/g, '').length > 0) {
         console.warn('[applySuggestion] No text to match, but doc is not empty');
@@ -183,26 +103,49 @@ export const createApplySuggestionCommand = (
     let matchCount = 0;
     const MAX_MATCHES = 1000;
     const docText = state.doc.textContent;
+    console.log('[applySuggestion] Searching for matches:', {
+      searchText,
+      pattern,
+      docText,
+    });
     while ((match = regex.exec(docText)) !== null) {
       if (match.index === regex.lastIndex) {
         regex.lastIndex++;
       }
       matchCount++;
       if (matchCount > MAX_MATCHES) {
+        console.warn('[applySuggestion] Too many matches found, stopping');
         break;
       }
       matches.push({
         index: match.index,
         length: match[0].length,
       });
+      console.log('[applySuggestion] Found match:', {
+        match: match[0],
+        index: match.index,
+        length: match[0].length,
+        matchCount,
+      });
     }
+    console.log('[applySuggestion] Total matches found:', matches.length, matches);
     if (!dispatch) return matches.length === 1;
     if (!view) return false;
     if (matches.length > 0) {
+      if (matches.length > 1) {
+        console.warn('[applySuggestion] Multiple matches found, only applying the first', matches);
+      }
       const applyingMatch = matches[0];
       const textMatchStart = applyingMatch.index + textBefore.length;
       const textMatchEnd = textMatchStart + textToReplace.length;
+      console.log('[applySuggestion] Applying match:', {
+        applyingMatch,
+        textMatchStart,
+        textMatchEnd,
+      });
       const docRange = findDocumentRange(state.doc, textMatchStart, textMatchEnd);
+      console.log('[applySuggestion] Document range:', docRange);
+      if (!dispatch) return true;
       return applySuggestionToRange(
         view,
         dispatch,
@@ -218,6 +161,11 @@ export const createApplySuggestionCommand = (
         username
       );
     }
+    console.warn('[applySuggestion] No matches found for suggestion', {
+      suggestion: { textToReplace, textReplacement, reason, textBefore, textAfter },
+      username,
+      docText,
+    });
     return false;
   };
 };
@@ -276,6 +224,7 @@ export const applySuggestion = (
   username: string,
   dryRun: boolean = false
 ): boolean => {
+  console.log('This is suggestion made it to applySuggestion:', suggestion);
   const command = createApplySuggestionCommand(suggestion, username);
   if (dryRun) return command(view.state);
   return command(view.state, view.dispatch, view);
