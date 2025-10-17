@@ -48,17 +48,6 @@ export default function Home() {
     <p>Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum</p>
   `;
 
-  // // Populate sectionOptions on initial render
-  // React.useEffect(() => {
-  //   const sections = getBoldSectionsText(initialContent);
-  //   setSectionOptions(sections);
-  //   if (sections.length > 0) {
-  //     setField(sections[0].title);
-  //     setCurrentValue(sections[0].text);
-  //     setNewValue('');
-  //   }
-  // }, []);
-
   // Validate button handler
   const handleValidateSections = () => {
     const result = validateSectionsFromHtml(editorContent);
@@ -100,6 +89,7 @@ export default function Home() {
   };
 
   const handlePersistentSuggestionsChange = (sectionArray: { title: string; text: string }[]) => {
+    setNewSuggestions([]); // Clear new suggestions on persistent suggestions change
     if (!sectionArray || sectionArray.length === 0) {
       console.log('[handlePersistentSuggestionsChange] Null or empty sectionArray, preserving current state.');
       return; // Do not update state if sectionArray is null or empty

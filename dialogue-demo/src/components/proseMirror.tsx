@@ -183,15 +183,32 @@ const SuggestionEditor = ({
         acceptButton.className = 'accept-button';
         acceptButton.onclick = () => {
           console.log('Accept button clicked');
-          console.log('Current persistentSuggestions before accept:', persistentSuggestionsRef.current);
+          
+          const suggestionData = getSuggestionTextFromRange(
+            viewRef.current.state.doc,
+            from,
+            to
+          );
+          
+          console.log('Suggestion data:', suggestionData);
+          
           handler.dispatch(acceptSuggestionsInRange(from, to));
+          
           setPersistentSuggestions((prev) => {
             const updated = prev.filter((s) => {
-              const textInRange = viewRef.current.state.doc.textBetween(from, to, '');
-              const isMatch =
-                textInRange === s.textToReplace ||
-                textInRange === s.textReplacement;
-              console.log('Text in range:', textInRange, 'Expected textToReplace:', s.textToReplace, 'Expected textReplacement:', s.textReplacement, 'isMatch:', isMatch);
+              // Match based on the actual suggestion data
+              const isMatch = 
+                (suggestionData.textReplacement === s.textReplacement &&
+                 suggestionData.suggestionType === 'insert') ||
+                (suggestionData.textToReplace === s.textToReplace &&
+                 suggestionData.suggestionType === 'delete');
+              
+              console.log('Comparing:',
+                '\n  Found:', suggestionData,
+                '\n  Expected:', { textToReplace: s.textToReplace, textReplacement: s.textReplacement },
+                '\n  isMatch:', isMatch
+              );
+              
               return !isMatch;
             });
             console.log('Updated persistentSuggestions after accept:', updated);
@@ -204,15 +221,31 @@ const SuggestionEditor = ({
         rejectButton.className = 'reject-button';
         rejectButton.onclick = () => {
           console.log('Reject button clicked');
-          console.log('Current persistentSuggestions before reject:', persistentSuggestionsRef.current);
+          
+          const suggestionData = getSuggestionTextFromRange(
+            viewRef.current.state.doc,
+            from,
+            to
+          );
+          
+          console.log('Suggestion data:', suggestionData);
+          
           handler.dispatch(rejectSuggestionsInRange(from, to));
+          
           setPersistentSuggestions((prev) => {
             const updated = prev.filter((s) => {
-              const textInRange = viewRef.current.state.doc.textBetween(from, to, '');
-              const isMatch =
-                textInRange === s.textToReplace ||
-                textInRange === s.textReplacement;
-              console.log('Text in range:', textInRange, 'Expected textToReplace:', s.textToReplace, 'Expected textReplacement:', s.textReplacement, 'isMatch:', isMatch);
+              const isMatch = 
+                (suggestionData.textReplacement === s.textReplacement &&
+                 suggestionData.suggestionType === 'insert') ||
+                (suggestionData.textToReplace === s.textToReplace &&
+                 suggestionData.suggestionType === 'delete');
+              
+              console.log('Comparing:',
+                '\n  Found:', suggestionData,
+                '\n  Expected:', { textToReplace: s.textToReplace, textReplacement: s.textReplacement },
+                '\n  isMatch:', isMatch
+              );
+              
               return !isMatch;
             });
             console.log('Updated persistentSuggestions after reject:', updated);
@@ -280,6 +313,60 @@ const SuggestionEditor = ({
     };
   }, []);
 
+  // Add the new function to handle suggestion text extraction
+  /**
+   * Get the actual suggestion text from a range, handling both deletions and insertions
+   * @param doc - The ProseMirror document
+   * @param from - Start position
+   * @param to - End position
+   * @returns Object with the text content, considering suggestion marks
+   */
+  function getSuggestionTextFromRange(doc: any, from: number, to: number): {
+    textToReplace: string;
+    textReplacement: string;
+    suggestionType: 'insert' | 'delete' | 'none';
+  } {
+    let textToReplace = '';
+    let textReplacement = '';
+    let suggestionType: 'insert' | 'delete' | 'none' = 'none';
+
+    doc.nodesBetween(from, to, (node: any, pos: number) => {
+      if (node.isText) {
+        const nodeFrom = Math.max(from, pos);
+        const nodeTo = Math.min(to, pos + node.nodeSize);
+        const start = nodeFrom - pos;
+        const end = nodeTo - pos;
+        const text = node.text.slice(start, end);
+
+        // Check for suggestion marks
+        const insertMark = node.marks.find((m: any) => m.type.name === 'suggestion_insert');
+        const deleteMark = node.marks.find((m: any) => m.type.name === 'suggestion_delete');
+
+        if (insertMark) {
+          // For insertions, the text is stored in the mark's attrs.text
+          textReplacement += insertMark.attrs.text || text;
+          suggestionType = 'insert';
+          // For insertions, textToReplace is empty (nothing was there before)
+        } else if (deleteMark) {
+          // For deletions, the original text is in the node's textContent
+          textToReplace += text;
+          suggestionType = 'delete';
+          // For deletions, textReplacement is empty (suggesting deletion)
+        } else {
+          // No suggestion mark, just regular text
+          textToReplace += text;
+          textReplacement += text;
+        }
+      }
+    });
+
+    return {
+      textToReplace,
+      textReplacement,
+      suggestionType
+    };
+  }
+
   // Update newUniqueSuggestions when newSuggestions changes
   useEffect(() => {
     if (newSuggestions && Array.isArray(newSuggestions)) {
@@ -298,6 +385,7 @@ const SuggestionEditor = ({
         return !isDuplicate;
       });
       setNewUniqueSuggestions(uniqueSuggestions);
+    
     }
   }, [newSuggestions]);
 
