@@ -6,8 +6,7 @@ import { applySuggestion } from "../utils/applySuggestion";
 import type { EditorView } from 'prosemirror-view';
 import { acceptSuggestionsInRange, rejectSuggestionsInRange } from 'prosemirror-suggestion-mode';
 import type { Command } from 'prosemirror-state';
-import { get } from 'http';
-import { getBoldSectionsText } from "../utils/sectionUtils";
+import { getBoldSectionsTextFromDoc } from "../utils/sectionUtils";
 
 export interface TextSuggestion {
   textToReplace: string;
@@ -178,6 +177,7 @@ const SuggestionEditor = ({
         const container = document.createElement('div');
         container.className = 'hover-menu-buttons';
 
+        // Update the acceptButton and rejectButton click handlers
         const acceptButton = document.createElement('button');
         acceptButton.textContent = 'Accept';
         acceptButton.className = 'accept-button';
@@ -188,7 +188,9 @@ const SuggestionEditor = ({
           setPersistentSuggestions((prev) => {
             const updated = prev.filter((s) => {
               const textInRange = viewRef.current.state.doc.textBetween(from, to, '');
-              const isMatch = textInRange === s.textToReplace || textInRange === s.textReplacement;
+              const isMatch =
+                textInRange === s.textToReplace ||
+                textInRange === s.textReplacement;
               console.log('Text in range:', textInRange, 'Expected textToReplace:', s.textToReplace, 'Expected textReplacement:', s.textReplacement, 'isMatch:', isMatch);
               return !isMatch;
             });
@@ -207,7 +209,9 @@ const SuggestionEditor = ({
           setPersistentSuggestions((prev) => {
             const updated = prev.filter((s) => {
               const textInRange = viewRef.current.state.doc.textBetween(from, to, '');
-              const isMatch = textInRange === s.textToReplace || textInRange === s.textReplacement;
+              const isMatch =
+                textInRange === s.textToReplace ||
+                textInRange === s.textReplacement;
               console.log('Text in range:', textInRange, 'Expected textToReplace:', s.textToReplace, 'Expected textReplacement:', s.textReplacement, 'isMatch:', isMatch);
               return !isMatch;
             });
@@ -246,15 +250,15 @@ const SuggestionEditor = ({
           const newState = view.state.apply(tr);
           view.updateState(newState);
           if (onContentChange && tr.docChanged) {
-            const sectionArray = extractTextWithDeletions(newState.doc);
-            onContentChange(sectionArray);
+            const sectionMap = getBoldSectionsTextFromDoc(newState.doc);
+            onContentChange(sectionMap);
           }
         },
       });
       viewRef.current = view;
       if (onContentChange) {
-        const sectionArray = extractTextWithDeletions(view.state.doc);
-        onContentChange(sectionArray);
+        const sectionMap = getBoldSectionsTextFromDoc(view.state.doc);
+        onContentChange(sectionMap);
       }
       (window as any).acceptAllSuggestions = () => {
         acceptAllSuggestions(view.state, view.dispatch);
@@ -297,23 +301,6 @@ const SuggestionEditor = ({
     }
   }, [newSuggestions]);
 
-  // Modify the function to include deletion suggestions and exclude addition/insertion suggestions
-  // Refine extractTextWithDeletions to extract text only within each bold section
-  // Fix the issue by ensuring parentHtml and text are defined before calling includes
-  // Modify extractTextWithDeletions to return a hashmap of title to text
-  const extractTextWithDeletions = (doc: any) => {
-    const serializer = modulesRef.current?.DOMSerializer.fromSchema(schemaRef.current);
-    if (!serializer || !doc.content) return {};
-
-    const fragment = serializer.serializeFragment(doc.content);
-    const tempDiv = document.createElement('div');
-    tempDiv.appendChild(fragment);
-    const html = tempDiv.innerHTML;
-
-    const sections = getBoldSectionsText(html, doc);
-    console.log('[sectionUtils] Extracted sections with deletions:', sections);
-    return sections;
-  };
 
   // Update persistentSuggestions when newUniqueSuggestions changes
   useEffect(() => {
@@ -331,7 +318,7 @@ const SuggestionEditor = ({
   useEffect(() => {
     if (viewRef.current) {
       const doc = viewRef.current.state.doc;
-      const sectionMap = extractTextWithDeletions(doc);
+      const sectionMap = getBoldSectionsTextFromDoc(doc);
       console.log('[SuggestionEditor] Extracted sectionMap on document change:', sectionMap);
       if (onContentChange) onContentChange(sectionMap);
     }
@@ -401,36 +388,4 @@ const SuggestionEditor = ({
 }
 export default SuggestionEditor;
 
-// Ensure extractTextWithDeletions is defined before exporting
-const extractTextWithDeletions = (doc: any) => {
-  const serializer = modulesRef.current?.DOMSerializer.fromSchema(schemaRef.current);
-  if (!serializer || !doc.content) return {};
 
-  const fragment = serializer.serializeFragment(doc.content);
-  const tempDiv = document.createElement('div');
-  tempDiv.appendChild(fragment);
-  const html = tempDiv.innerHTML;
-
-  const sections = getBoldSectionsText(html, doc);
-  const sectionMap: Record<string, string> = {};
-
-  sections.forEach(({ title, text }) => {
-    let filteredText = '';
-    doc.descendants((node: any, pos: number, parent: any) => {
-      if (
-        node.text &&
-        (!node.marks || !node.marks.some((mark: any) => mark.type.name === 'suggestion' && mark.attrs.type === 'insertion'))
-      ) {
-        const parentHtml = parent ? serializer.serializeFragment(parent.content).outerHTML : '';
-        if (parentHtml && text && parentHtml.includes(text)) {
-          filteredText += node.text;
-        }
-      }
-    });
-    sectionMap[title] = String(filteredText.trim());
-  });
-
-  return sectionMap;
-};
-
-export { extractTextWithDeletions };

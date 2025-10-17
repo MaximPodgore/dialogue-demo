@@ -1,4 +1,4 @@
-import { getBoldSectionsText } from "./sectionUtils";
+import { getBoldSectionsTextFromDoc } from "./sectionUtils";
 
 export const MIN_TEXT_LENGTH = 2;
 export const MAX_TEXT_LENGTH = 5;
@@ -14,7 +14,7 @@ export interface SectionValidationResult {
 }
 
 export function validateSectionsFromHtml(html: string): SectionValidationResult {
-  const sections = getBoldSectionsText(html);
+  const sections = getBoldSectionsTextFromDoc(html);
   const errors: string[] = [];
   let valid = true;
   for (const section of sections) {

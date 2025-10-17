@@ -4,7 +4,6 @@ import React, { useState, useRef } from "react";
 
 import SuggestionEditor from "@/components/proseMirror";
 import { TextSuggestion } from "@/components/proseMirror";
-import { getBoldSectionsText } from "@/utils/sectionUtils";
 import { formToSuggestion } from "@/utils/formToSuggestion";
 import { validateSectionsFromHtml } from "../utils/validateSections";
 
@@ -119,7 +118,7 @@ export default function Home() {
     title,
     text,
   }));
-    console.log('[handlePersistentSuggestionsChange] Correctly mapped sections after type fix:', updatedSections);
+    //console.log('[handlePersistentSuggestionsChange] Correctly mapped sections after type fix:', updatedSections);
     sectionsRef.current = updatedSections; // Update shared sections variable
     setSectionOptions(updatedSections);
 
@@ -363,7 +362,7 @@ export default function Home() {
               />
             </div>
             {/* Validate Button and Results */}
-            <div className="w-full flex flex-col items-center mt-6">
+            {/* <div className="w-full flex flex-col items-center mt-6">
               <button
                 type="button"
                 className="px-4 py-2 border border-gray-300 rounded-md hover:bg-gray-50 transition-colors text-sm font-medium bg-white"
@@ -384,7 +383,7 @@ export default function Home() {
                   )}
                 </div>
               )}
-            </div>
+            </div> */}
           </div>
         </section>
       </div>
