@@ -14,6 +14,7 @@ export default function Home() {
   const [newSuggestions, setNewSuggestions] = useState<TextSuggestion[]>([]);
   // Selected field (section title)
   const [field, setField] = useState('');
+
   // Current value (readonly)
   const [currentValue, setCurrentValue] = useState('');
   // New value (editable)
@@ -29,6 +30,7 @@ export default function Home() {
 
   // Shared sections variable
   const sectionsRef = useRef<{ title: string; text: string }[]>([]);
+  const fieldRef = useRef<string>(field);
 
   // Initial content from ProseMirrorDemo 
   const initialContent = `
@@ -54,12 +56,25 @@ export default function Home() {
     setValidationResult(result);
   };
 
+  React.useEffect(() => { fieldRef.current = field; }, [field]);
+
+  // Ensure sectionsRef/current and sectionOptions produce a valid field on load:
+  React.useEffect(() => {
+    if (sectionOptions.length === 0) return;
+    // If current field is missing or not in options, pick the first
+    const exists = sectionOptions.some(s => s.title === fieldRef.current);
+    if (!exists) {
+      setField(sectionOptions[0].title);
+      setCurrentValue(sectionOptions[0].text);
+    }
+  }, [sectionOptions]);
 
   // When field changes, update currentValue and newValue to current section text
   const handleFieldChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     const selectedTitle = e.target.value;
     setField(selectedTitle);
-    // Use shared sections variable
+    fieldRef.current = selectedTitle; // update ref immediately
+    console.log("Selected field:", selectedTitle);
     const section = sectionsRef.current.find(s => s.title === selectedTitle);
     const text = section ? section.text : '';
     setCurrentValue(text);
@@ -68,11 +83,10 @@ export default function Home() {
 
   // When dropdown is opened, refresh sectionOptions from latest editorContent (fallback to initialContent)
   const handleFieldDropdownOpen = () => {
-    // Use shared sections variable
     if (sectionsRef.current.length === 0) return;
-    // Only change field/currentValue if current field is missing
-    if (!sectionsRef.current.some(s => s.title === field)) {
+    if (!sectionsRef.current.some(s => s.title === fieldRef.current)) {
       setField(sectionsRef.current[0].title);
+      fieldRef.current = sectionsRef.current[0].title;
       setCurrentValue(sectionsRef.current[0].text);
       setNewValue('');
     }
@@ -101,33 +115,30 @@ export default function Home() {
     return acc;
   }, {} as Record<string, string>);
 
-  console.log('[handlePersistentSuggestionsChange] Converted sectionMap:', sectionMap);
-
-  // Create updatedSections array again if needed
-  const updatedSections = Object.entries(sectionMap).map(([title, text]) => ({
-    title,
-    text,
-  }));
-    //console.log('[handlePersistentSuggestionsChange] Correctly mapped sections after type fix:', updatedSections);
+  const updatedSections = Object.entries(sectionMap).map(([title, text]) => ({ title, text }));
     sectionsRef.current = updatedSections; // Update shared sections variable
     setSectionOptions(updatedSections);
 
     console.log('[handlePersistentSuggestionsChange] Updated sections:', updatedSections);
 
     if (updatedSections.length > 0) {
-      const currentField = updatedSections.find(section => section.title === field);
-      console.log('[handlePersistentSuggestionsChange] Current field:', currentField);
+      console.log('[handlePersistentSuggestionsChange] Current field before update (from ref):', fieldRef.current);
+      console.log('[handlePersistentSuggestionsChange] Updated sections titles:', updatedSections.map(s => s.title));
+      const currentField = updatedSections.find(section => section.title === fieldRef.current);
+      console.log('[handlePersistentSuggestionsChange] Current field (found):', currentField);
 
       if (currentField) {
         setCurrentValue(currentField.text);
       } else {
-        console.log('[handlePersistentSuggestionsChange] Current field not found, defaulting to first section.');
+        console.warn('[handlePersistentSuggestionsChange] Current field not found, defaulting to first section.');
         setField(updatedSections[0].title);
+        fieldRef.current = updatedSections[0].title;
         setCurrentValue(updatedSections[0].text);
       }
     } else {
       console.log('[handlePersistentSuggestionsChange] No sections available, clearing state.');
       setField('');
+      fieldRef.current = '';
       setCurrentValue('');
     }
   };
@@ -186,6 +197,7 @@ export default function Home() {
                       el.style.height = el.scrollHeight + 'px';
                     }
                   }}
+                  readOnly
                 />
               </div>
               <div>
