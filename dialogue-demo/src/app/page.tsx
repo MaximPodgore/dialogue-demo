@@ -31,6 +31,11 @@ export default function Home() {
   // Shared sections variable
   const sectionsRef = useRef<{ title: string; text: string }[]>([]);
   const fieldRef = useRef<string>(field);
+  // Ref to store newValues per section
+  const newValuesRef = useRef<Record<string, string>>({});
+
+  // Ref to track if initialization has already occurred
+  const hasInitializedRef = useRef(false);
 
   // Initial content from ProseMirrorDemo 
   const initialContent = `
@@ -78,7 +83,19 @@ export default function Home() {
     const section = sectionsRef.current.find(s => s.title === selectedTitle);
     const text = section ? section.text : '';
     setCurrentValue(text);
-    setNewValue('');
+
+    // Retrieve newValue from ref or set to empty string if not present
+    setNewValue(newValuesRef.current[selectedTitle] || '');
+  };
+
+  const handleNewValueChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    const updatedValue = e.target.value;
+    setNewValue(updatedValue);
+
+    // Update newValuesRef for the current field
+    if (fieldRef.current) {
+      newValuesRef.current[fieldRef.current] = updatedValue;
+    }
   };
 
   // When dropdown is opened, refresh sectionOptions from latest editorContent (fallback to initialContent)
@@ -104,22 +121,43 @@ export default function Home() {
 
   const handlePersistentSuggestionsChange = (sectionArray: { title: string; text: string }[]) => {
     setNewSuggestions([]); // Clear new suggestions on persistent suggestions change
+
     if (!sectionArray || sectionArray.length === 0) {
       console.log('[handlePersistentSuggestionsChange] Null or empty sectionArray, preserving current state.');
       return; // Do not update state if sectionArray is null or empty
     }
+
     console.log('[handlePersistentSuggestionsChange] Received sectionArray:', sectionArray);
 
     const sectionMap: Record<string, string> = sectionArray.reduce((acc, { title, text }) => {
-    acc[title] = text;
-    return acc;
-  }, {} as Record<string, string>);
+      acc[title] = text;
+      return acc;
+    }, {} as Record<string, string>);
 
-  const updatedSections = Object.entries(sectionMap).map(([title, text]) => ({ title, text }));
+    const updatedSections = Object.entries(sectionMap).map(([title, text]) => ({ title, text }));
     sectionsRef.current = updatedSections; // Update shared sections variable
     setSectionOptions(updatedSections);
 
     console.log('[handlePersistentSuggestionsChange] Updated sections:', updatedSections);
+
+    if (!hasInitializedRef.current && updatedSections.length > 0) {
+      console.log('[handlePersistentSuggestionsChange] Initializing newValuesRef and newValue');
+
+      // Initialize newValuesRef
+      const initialNewValues: Record<string, string> = {};
+      updatedSections.forEach((section) => {
+        initialNewValues[section.title] = section.text;
+      });
+      newValuesRef.current = initialNewValues;
+
+      // Set newValue for the initially selected field
+      const initialField = updatedSections[0].title;
+      setField(initialField);
+      setNewValue(initialNewValues[initialField]);
+
+      // Mark initialization as complete
+      hasInitializedRef.current = true;
+    }
 
     if (updatedSections.length > 0) {
       console.log('[handlePersistentSuggestionsChange] Current field before update (from ref):', fieldRef.current);
@@ -205,13 +243,7 @@ export default function Home() {
                 <textarea
                   name="newValue"
                   value={newValue}
-                  onChange={e => {
-                    setNewValue(e.target.value);
-                    if (e.target) {
-                      e.target.style.height = 'auto';
-                      e.target.style.height = e.target.scrollHeight + 'px';
-                    }
-                  }}
+                  onChange={handleNewValueChange}
                   className="w-full border rounded px-3 py-2 resize-none focus:outline-none"
                   required
                   placeholder="The new value for the field"
