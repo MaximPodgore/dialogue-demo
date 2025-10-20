@@ -1,9 +1,7 @@
 "use client";
 
 import React, { useEffect, useRef, useState } from 'react';
-import { processSuggestionRejection } from "../utils/suggestionRejection";
 import { applySuggestion } from "../utils/applySuggestion";
-import type { EditorView } from 'prosemirror-view';
 import { acceptSuggestionsInRange, rejectSuggestionsInRange } from 'prosemirror-suggestion-mode';
 import type { Command } from 'prosemirror-state';
 import { getBoldSectionsTextFromDoc } from "../utils/sectionUtils";
@@ -55,10 +53,9 @@ const SuggestionEditor = ({
     persistentSuggestionsRef.current = persistentSuggestions;
   }, [persistentSuggestions]);
 
-  // Initialize editor only once
+  // Initialize editor only once, have to use dynamic imports
   useEffect(() => {
     if (!editorContainerRef.current) return;
-    let destroyed = false;
     const loadEditor = async () => {
       const [
         { EditorState, Plugin },
@@ -142,6 +139,7 @@ const SuggestionEditor = ({
       const uneditablePlugin = new Plugin({
         props: {
           handleDOMEvents: {
+            //on load, turns bold/strong text (section titles) into uneditable text
             beforeinput(view, event) {
               const sel = view.state.selection;
               if (sel.empty) {
@@ -168,14 +166,14 @@ const SuggestionEditor = ({
           },
         },
       });
-      // Ported createButtonsComponent from hoverMenu.ts and attached setPersistentSuggestions
+      // Ported createButtonsComponent from package so that our button clicks update our suggestion tracking
       const createButtonsComponent = (
         from: number,
         to: number,
         handler: { dispatch: (command: Command) => void }
       ): { dom: HTMLElement } => {
         const container = document.createElement('div');
-        container.className = 'flex gap-2'; // Ensure buttons are horizontally stacked with spacing
+        container.className = 'flex gap-2'; 
 
         const acceptButton = document.createElement('button');
         acceptButton.textContent = 'Accept';
@@ -303,11 +301,10 @@ const SuggestionEditor = ({
       if (editorContainerRef.current) {
         editorContainerRef.current.innerHTML = '';
       }
-      destroyed = true;
     };
   }, []);
 
-  // Add the new function to handle suggestion text extraction
+  // Add the new function to handle suggestion text extraction (figuring out which suggestion proseMirror wants to accept/reject)
   /**
    * Get the actual suggestion text from a range, handling both deletions and insertions
    * @param doc - The ProseMirror document
@@ -364,15 +361,17 @@ const SuggestionEditor = ({
   // Update newUniqueSuggestions when newSuggestions changes
   useEffect(() => {
     if (newSuggestions && Array.isArray(newSuggestions)) {
-      console.log('[SuggestionEditor] Received newSuggestions:', newSuggestions);
+      //console.log('[SuggestionEditor] Received newSuggestions:', newSuggestions);
       const uniqueSuggestions = newSuggestions.filter((newSuggestion) => {
         const isDuplicate = persistentSuggestions.some(
           (existing) =>
             existing.textToReplace === newSuggestion.textToReplace &&
-            existing.textReplacement === newSuggestion.textReplacement
+            existing.textReplacement === newSuggestion.textReplacement &&
+            existing.textBefore === newSuggestion.textBefore &&
+            existing.textAfter === newSuggestion.textAfter 
         );
         if (isDuplicate) {
-          console.log('[SuggestionEditor] Duplicate suggestion ignored:', newSuggestion);
+          //console.log('[SuggestionEditor] Duplicate suggestion ignored:', newSuggestion);
         } else {
           console.log('[SuggestionEditor] Adding new suggestion to uniqueSuggestions:', newSuggestion);
         }
@@ -384,8 +383,15 @@ const SuggestionEditor = ({
   }, [newSuggestions]);
 
 
-  // Update persistentSuggestions when newUniqueSuggestions changes
+  // Apply newUniqueSuggestions when they change, and add them to persistentSuggestions
   useEffect(() => {
+    if (viewRef.current && newUniqueSuggestions.length > 0) {
+      newUniqueSuggestions.forEach((suggestion) => {
+        if (modulesRef.current && modulesRef.current.applySuggestion) {
+          modulesRef.current.applySuggestion(viewRef.current, suggestion, suggestion.username);
+        }
+      });
+    }
     if (newUniqueSuggestions.length > 0) {
       setPersistentSuggestions((prev) => {
         const updatedSuggestions = [...prev, ...newUniqueSuggestions];
@@ -396,26 +402,15 @@ const SuggestionEditor = ({
     }
   }, [newUniqueSuggestions]);
 
-  // Trigger extractTextWithDeletions on document changes
+  // Trigger getBoldSectionsTextFromDoc on document changes, to then call onContentChange
   useEffect(() => {
     if (viewRef.current) {
       const doc = viewRef.current.state.doc;
-      const sectionMap = getBoldSectionsTextFromDoc(doc);
-      console.log('[SuggestionEditor] Extracted sectionMap on document change:', sectionMap);
-      if (onContentChange) onContentChange(sectionMap);
+      const sectionArray = getBoldSectionsTextFromDoc(doc);
+      console.log('[SuggestionEditor] Extracted sectionArray on document change:', sectionArray);
+      if (onContentChange) onContentChange(sectionArray);
     }
   }, [persistentSuggestions]);
-
-  // Apply suggestions from the newUniqueSuggestions
-  useEffect(() => {
-    if (viewRef.current && newUniqueSuggestions.length > 0) {
-      newUniqueSuggestions.forEach((suggestion) => {
-        if (modulesRef.current && modulesRef.current.applySuggestion) {
-          modulesRef.current.applySuggestion(viewRef.current, suggestion, suggestion.username);
-        }
-      });
-    }
-  }, [newUniqueSuggestions]);
 
   // Accept all suggestions and update the persistent list
   const acceptAll = () => {
@@ -431,12 +426,6 @@ const SuggestionEditor = ({
       (window as any).rejectAllSuggestions();
       setPersistentSuggestions([]); // Clear the list after rejecting all
     }
-  };
-
-  // Add a function to get the current persistentSuggestions
-  const getPersistentSuggestions = () => {
-    console.log('Current persistentSuggestions:', persistentSuggestions);
-    return persistentSuggestions;
   };
 
   return (

@@ -29,7 +29,7 @@ const applySuggestionToRange = (
     username,
     skipSuggestionOperation: false,
   });
-  console.log("Suggestion textReplacement:", suggestion.textReplacement);
+  //console.log("Suggestion textReplacement:", suggestion.textReplacement);
   if (!suggestion.textReplacement || suggestion.textReplacement.trim() === '') {
     // Use deletion if textReplacement is null or empty string
     tr.delete(from, to);
@@ -73,7 +73,6 @@ export const createApplySuggestionCommand = (
       textAfter,
     });
     const searchText = textBefore + textToReplace + textAfter;
-    console.log('Searchtext:', searchText);
     if (searchText.length === 0) {
       if (state.doc.textContent.trim().replace(/\u200B/g, '').length > 0) {
         console.warn('[applySuggestion] No text to match, but doc is not empty');

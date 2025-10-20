@@ -19,14 +19,9 @@ export default function Home() {
   const [currentValue, setCurrentValue] = useState('');
   // New value (editable)
   const [newValue, setNewValue] = useState('');
-  // Store editor content for section extraction
-  const [editorContent, setEditorContent] = useState<string>('');
-  // Validation state
-  const [validationResult, setValidationResult] = useState<{ valid: boolean; errors: string[] } | null>(null);
   // Section titles and text
   const [sectionOptions, setSectionOptions] = useState<{ title: string; text: string }[]>([]);
-  // Add state to track persistent suggestions
-  const [persistentSuggestions, setPersistentSuggestions] = useState<TextSuggestion[]>([]);
+
 
   // Shared sections variable
   const sectionsRef = useRef<{ title: string; text: string }[]>([]);
@@ -36,6 +31,13 @@ export default function Home() {
 
   // Ref to track if initialization has already occurred
   const hasInitializedRef = useRef(false);
+
+  // Keep the mutable ref in sync with the React state so handlers can
+  // synchronously read the latest sections without writing to the ref
+  // from multiple places.
+  React.useEffect(() => {
+    sectionsRef.current = sectionOptions;
+  }, [sectionOptions]);
 
   // Initial content from ProseMirrorDemo 
   const initialContent = `
@@ -55,11 +57,6 @@ export default function Home() {
     <p>Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum</p>
   `;
 
-  // Validate button handler
-  const handleValidateSections = () => {
-    const result = validateSectionsFromHtml(editorContent);
-    setValidationResult(result);
-  };
 
   React.useEffect(() => { fieldRef.current = field; }, [field]);
 
@@ -79,7 +76,7 @@ export default function Home() {
     const selectedTitle = e.target.value;
     setField(selectedTitle);
     fieldRef.current = selectedTitle; // update ref immediately
-    console.log("Selected field:", selectedTitle);
+    //console.log("Selected field:", selectedTitle);
     const section = sectionsRef.current.find(s => s.title === selectedTitle);
     const text = section ? section.text : '';
     setCurrentValue(text);
@@ -98,7 +95,7 @@ export default function Home() {
     }
   };
 
-  // When dropdown is opened, refresh sectionOptions from latest editorContent (fallback to initialContent)
+  // When dropdown is opened, refresh sectionOptions from latest editorContent 
   const handleFieldDropdownOpen = () => {
     if (sectionsRef.current.length === 0) return;
     if (!sectionsRef.current.some(s => s.title === fieldRef.current)) {
@@ -119,39 +116,30 @@ export default function Home() {
     // Do not clear the form fields after submission
   };
 
-  const handlePersistentSuggestionsChange = (sectionArray: { title: string; text: string }[]) => {
-    setNewSuggestions([]); // Clear new suggestions on persistent suggestions change
+  const handleProseMirrorChanges = (sectionArray: { title: string; text: string }[]) => {
+    setNewSuggestions([]); // Clear new suggestions on persistent suggestions change (removes buildup of stale/dupe suggestions)
 
     if (!sectionArray || sectionArray.length === 0) {
-      console.log('[handlePersistentSuggestionsChange] Null or empty sectionArray, preserving current state.');
+      console.log('[handleProseMirrorChanges] Null or empty sectionArray, preserving current state.');
       return; // Do not update state if sectionArray is null or empty
     }
 
-    console.log('[handlePersistentSuggestionsChange] Received sectionArray:', sectionArray);
+    console.log('[handleProseMirrorChanges] Received sectionArray and updatedSections:', sectionArray);
+    setSectionOptions(sectionArray);
 
-    const sectionMap: Record<string, string> = sectionArray.reduce((acc, { title, text }) => {
-      acc[title] = text;
-      return acc;
-    }, {} as Record<string, string>);
-
-    const updatedSections = Object.entries(sectionMap).map(([title, text]) => ({ title, text }));
-    sectionsRef.current = updatedSections; // Update shared sections variable
-    setSectionOptions(updatedSections);
-
-    console.log('[handlePersistentSuggestionsChange] Updated sections:', updatedSections);
-
-    if (!hasInitializedRef.current && updatedSections.length > 0) {
-      console.log('[handlePersistentSuggestionsChange] Initializing newValuesRef and newValue');
+    //one-time initialization logic for newValuesRef and newValue
+    if (!hasInitializedRef.current && sectionArray.length > 0) {
+      console.log('[handleProseMirrorChanges] Initializing newValuesRef and newValue');
 
       // Initialize newValuesRef
       const initialNewValues: Record<string, string> = {};
-      updatedSections.forEach((section) => {
+      sectionArray.forEach((section) => {
         initialNewValues[section.title] = section.text;
       });
       newValuesRef.current = initialNewValues;
 
       // Set newValue for the initially selected field
-      const initialField = updatedSections[0].title;
+      const initialField = sectionArray[0].title;
       setField(initialField);
       setNewValue(initialNewValues[initialField]);
 
@@ -159,35 +147,24 @@ export default function Home() {
       hasInitializedRef.current = true;
     }
 
-    if (updatedSections.length > 0) {
-      console.log('[handlePersistentSuggestionsChange] Current field before update (from ref):', fieldRef.current);
-      console.log('[handlePersistentSuggestionsChange] Updated sections titles:', updatedSections.map(s => s.title));
-      const currentField = updatedSections.find(section => section.title === fieldRef.current);
-      console.log('[handlePersistentSuggestionsChange] Current field (found):', currentField);
+    if (sectionArray.length > 0) {
+      const currentField = sectionArray.find(section => section.title === fieldRef.current);
+
 
       if (currentField) {
         setCurrentValue(currentField.text);
       } else {
-        console.warn('[handlePersistentSuggestionsChange] Current field not found, defaulting to first section.');
-        setField(updatedSections[0].title);
-        fieldRef.current = updatedSections[0].title;
-        setCurrentValue(updatedSections[0].text);
+        console.warn('[handleProseMirrorChanges] Current field not found, defaulting to first section.');
+        setField(sectionArray[0].title);
+        fieldRef.current = sectionArray[0].title;
+        setCurrentValue(sectionArray[0].text);
       }
     } else {
-      console.log('[handlePersistentSuggestionsChange] No sections available, clearing state.');
+      console.log('[handleProseMirrorChanges] No sections available, clearing state.');
       setField('');
       fieldRef.current = '';
       setCurrentValue('');
     }
-  };
-
-  // Remove MutationObserver and rely on SuggestionEditor for updates
-  React.useEffect(() => {
-    // Cleanup logic if needed
-  }, [field, persistentSuggestions]);
-
-  const handleContentChange = (sectionArray: { title: string; text: string }[]) => {
-    handlePersistentSuggestionsChange(sectionArray);
   };
 
   return (
@@ -392,32 +369,9 @@ export default function Home() {
                 initialContent={initialContent}
                 newSuggestions={newSuggestions}
                 styleMode={styleMode}
-                onContentChange={handleContentChange}
+                onContentChange={handleProseMirrorChanges}
               />
             </div>
-            {/* Validate Button and Results */}
-            {/* <div className="w-full flex flex-col items-center mt-6">
-              <button
-                type="button"
-                className="px-4 py-2 border border-gray-300 rounded-md hover:bg-gray-50 transition-colors text-sm font-medium bg-white"
-                onClick={handleValidateSections}
-              >
-                Validate Sections
-              </button>
-              {validationResult && (
-                <div className={`mt-4 w-full max-w-lg p-4 rounded ${validationResult.valid ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
-                  {validationResult.valid ? (
-                    <span>All sections are valid!</span>
-                  ) : (
-                    <ul className="list-disc pl-5">
-                      {validationResult.errors.map((err, idx) => (
-                        <li key={idx}>{err}</li>
-                      ))}
-                    </ul>
-                  )}
-                </div>
-              )}
-            </div> */}
           </div>
         </section>
       </div>
