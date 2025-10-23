@@ -42,16 +42,6 @@ const SuggestionEditor = ({
 
   // Add a state to maintain the persistent list of suggestions
   const [persistentSuggestions, setPersistentSuggestions] = useState<TextSuggestion[]>([]);
-  // Add a state to track newUniqueSuggestions
-  const [newUniqueSuggestions, setNewUniqueSuggestions] = useState<TextSuggestion[]>([]);
-
-  // Use a ref to store the latest persistentSuggestions
-  const persistentSuggestionsRef = useRef(persistentSuggestions);
-
-  // Update the persistentSuggestions ref whenever persistentSuggestions state changes
-  useEffect(() => {
-    persistentSuggestionsRef.current = persistentSuggestions;
-  }, [persistentSuggestions]);
 
   // Initialize editor only once, have to use dynamic imports
   useEffect(() => {
@@ -358,10 +348,11 @@ const SuggestionEditor = ({
     };
   }
 
-  // Update newUniqueSuggestions when newSuggestions changes
+  // filter dupes out of newSuggestions and apply unique ones and then update persistentSuggestions
   useEffect(() => {
     if (newSuggestions && Array.isArray(newSuggestions)) {
       //console.log('[SuggestionEditor] Received newSuggestions:', newSuggestions);
+
       const uniqueSuggestions = newSuggestions.filter((newSuggestion) => {
         const isDuplicate = persistentSuggestions.some(
           (existing) =>
@@ -377,30 +368,25 @@ const SuggestionEditor = ({
         }
         return !isDuplicate;
       });
-      setNewUniqueSuggestions(uniqueSuggestions);
-    
+      
+      //apply unique suggestions to the editor
+      if (viewRef.current && uniqueSuggestions.length > 0) {
+        uniqueSuggestions.forEach((suggestion) => {
+          if (modulesRef.current && modulesRef.current.applySuggestion) {
+            modulesRef.current.applySuggestion(viewRef.current, suggestion, suggestion.username);
+          }
+        });
+      }
+      //update persistentSuggestions with uniqueSuggestions
+      if (uniqueSuggestions.length > 0) {
+        setPersistentSuggestions((prev) => {
+          const updatedSuggestions = [...prev, ...uniqueSuggestions];
+          console.log('[SuggestionEditor] Updated persistentSuggestions:', updatedSuggestions);
+          return updatedSuggestions;
+        });
+      }
     }
   }, [newSuggestions]);
-
-
-  // Apply newUniqueSuggestions when they change, and add them to persistentSuggestions
-  useEffect(() => {
-    if (viewRef.current && newUniqueSuggestions.length > 0) {
-      newUniqueSuggestions.forEach((suggestion) => {
-        if (modulesRef.current && modulesRef.current.applySuggestion) {
-          modulesRef.current.applySuggestion(viewRef.current, suggestion, suggestion.username);
-        }
-      });
-    }
-    if (newUniqueSuggestions.length > 0) {
-      setPersistentSuggestions((prev) => {
-        const updatedSuggestions = [...prev, ...newUniqueSuggestions];
-        console.log('[SuggestionEditor] Updated persistentSuggestions:', updatedSuggestions);
-        return updatedSuggestions;
-      });
-
-    }
-  }, [newUniqueSuggestions]);
 
   // Trigger getBoldSectionsTextFromDoc on document changes, to then call onContentChange
   useEffect(() => {
